@@ -63,7 +63,7 @@ namespace Memoria.Data
 
             public static Boolean CheckCanSpeak(BTL_DATA btl, Int32 voicePriority, BattleStatus statusException = 0)
             {
-                if (btl.bi.disappear != 0)
+                if (btl.bi.disappear != 0 && ((statusException & BattleStatus.Jump) == 0 || !btl_stat.CheckStatus(btl, BattleStatus.Jump)))
                     return false;
                 if (btl_stat.CheckStatus(btl, BattleStatusConst.CannotSpeak & ~statusException))
                     return false;
@@ -238,6 +238,7 @@ namespace Memoria.Data
                     }
                     catch (Exception err)
                     {
+                        Log.Error($"[VoiceActing] Couldn't evaluate condition: '{effect.Condition.Trim()}'");
                         Log.Error(err);
                         continue;
                     }
@@ -295,6 +296,7 @@ namespace Memoria.Data
                     }
                     catch (Exception err)
                     {
+                        Log.Error($"[VoiceActing] Couldn't evaluate condition: '{effect.Condition.Trim()}'");
                         Log.Error(err);
                         continue;
                     }
@@ -341,6 +343,7 @@ namespace Memoria.Data
                     }
                     catch (Exception err)
                     {
+                        Log.Error($"[VoiceActing] Couldn't evaluate condition: '{effect.Condition.Trim()}'");
                         Log.Error(err);
                         continue;
                     }
@@ -389,6 +392,7 @@ namespace Memoria.Data
                     }
                     catch (Exception err)
                     {
+                        Log.Error($"[VoiceActing] Couldn't evaluate condition: '{effect.Condition.Trim()}'");
                         Log.Error(err);
                         continue;
                     }

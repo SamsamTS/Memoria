@@ -6,6 +6,8 @@ using FF9;
 using Memoria;
 using Memoria.Scripts;
 using Object = System.Object;
+using Memoria.Prime;
+using Assets.Scripts.Common;
 
 [Flags]
 public enum FieldMapFlags : uint
@@ -24,7 +26,6 @@ public enum FieldMapFlags : uint
     Generic127 = Unknown128 - 1,
     Unknown128 = 128,
 }
-
 
 public class FieldMap : HonoBehavior
 {
@@ -107,6 +108,7 @@ public class FieldMap : HonoBehavior
             this.rainRenderer = goCamera.AddComponent<FieldRainRenderer>();
         }
         this.camIdx = 0;
+        //Log.Message("HonoAwake() this.camIdx = 0;");
         this.curCamIdx = -1;
         this.charAimHeight = 324;
         this.mapName = FF9StateSystem.Field.SceneName;
@@ -118,7 +120,7 @@ public class FieldMap : HonoBehavior
         HonoBehaviorSystem.TargetFrameTime = 0.0333333351f;
         this.attachList = new EBG_ATTACH_DEF[10];
         this.isBattleBackupPos = false;
-        this.EBG_init();
+        this.BG_init();
         if (FF9StateSystem.Common.FF9.fldMapNo == 2507) // I. Castle/Stairwell, room with ladders and stairs
         {
             base.StartCoroutine(this.DelayedActiveTri());
@@ -183,9 +185,7 @@ public class FieldMap : HonoBehavior
 
     public BGCAM_DEF GetCurrentBgCamera()
     {
-        if (FF9StateSystem.Common.FF9.fldMapNo == 70) // Opening-For FMV
-            return null;
-        if (this.curCamIdx < 0 || this.curCamIdx > this.scene.cameraList.Count)
+        if (FF9StateSystem.Common.FF9.fldMapNo == 70 || this.curCamIdx < 0 || this.curCamIdx > this.scene.cameraList.Count)
             return null;
         return this.scene.cameraList[this.camIdx];
     }
@@ -217,12 +217,12 @@ public class FieldMap : HonoBehavior
 
     public void CreateBorder(Int32 overlayNdx, Byte r, Byte g, Byte b)
     {
-        BGOVERLAY_DEF bgoverlay_DEF = this.scene.overlayList[overlayNdx];
+        BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
         Material material = new Material(ShadersLoader.Find("PSX/FieldMap_Abr_None"));
         for (Int32 i = 0; i < 4; i++)
         {
             GameObject gameObject = new GameObject("border" + i.ToString("D3"));
-            gameObject.transform.parent = bgoverlay_DEF.transform;
+            gameObject.transform.parent = bgOverlay.transform;
             gameObject.transform.localPosition = Vector3.zero;
             gameObject.transform.localRotation = Quaternion.identity;
             gameObject.transform.localScale = Vector3.one;
@@ -241,27 +241,27 @@ public class FieldMap : HonoBehavior
             {
                 case 0:
                     width = -this.scene.cameraList[index].vrpMinX;
-                    height = bgoverlay_DEF.h;
+                    height = bgOverlay.h;
                     posX = 0;
                     posY = height;
                     break;
                 case 1:
                     width = this.scene.cameraList[index].vrpMinX;
-                    height = bgoverlay_DEF.h;
-                    posX = bgoverlay_DEF.w;
+                    height = bgOverlay.h;
+                    posX = bgOverlay.w;
                     posY = height;
                     break;
                 case 2:
-                    width = bgoverlay_DEF.w;
+                    width = bgOverlay.w;
                     height = this.scene.cameraList[index].vrpMinY;
                     posX = 0;
                     posY = 0;
                     break;
                 case 3:
-                    width = bgoverlay_DEF.w;
+                    width = bgOverlay.w;
                     height = -this.scene.cameraList[0].vrpMinY;
                     posX = 0;
-                    posY = bgoverlay_DEF.h;
+                    posY = bgOverlay.h;
                     break;
             }
             vertList.Add(new Vector3(posX, posY - height, 0f));
@@ -309,8 +309,19 @@ public class FieldMap : HonoBehavior
             }
         }
         this.ActivateCamera();
-        this.EBG_animationService();
-        this.EBG_attachService();
+        this.BgAnimationService();
+        this.BgAttachService();
+    }
+
+    public override void HonoLateUpdate()
+    {
+        this.SceneService2DScroll();
+        this.SceneService3DScroll();
+        if (Configuration.Graphics.InitializeWidescreenSupport())
+            OnWidescreenSupportChanged();
+        this.CenterCameraOnPlayer();
+        this.SceneServiceScroll(this.scene);
+        this.UpdateOverlayAll();
     }
 
     public override void HonoOnGUI()
@@ -386,22 +397,6 @@ public class FieldMap : HonoBehavior
         return result;
     }
 
-    public override void HonoLateUpdate()
-    {
-        this.EBG_sceneService2DScroll();
-        this.EBG_sceneService3DScroll();
-        this.EBG_sceneServiceScroll(this.scene);
-        if (Configuration.Graphics.InitializeWidescreenSupport())
-            OnWidescreenSupportChanged();
-        this.CenterCameraOnPlayer();
-        this.UpdateOverlayAll();
-    }
-
-    public Int32 GetCurrentCameraIndex()
-    {
-        return this.camIdx;
-    }
-
     public void SetCurrentCameraIndex(Int32 newCamIdx)
     {
         if (this.camIdx == newCamIdx)
@@ -413,6 +408,7 @@ public class FieldMap : HonoBehavior
         BGCAM_DEF bgCamera = this.scene.cameraList[this.camIdx];
         Vector2 centerOffset = bgCamera.GetCenterOffset();
         this.offset.x = centerOffset.x + bgCamera.w / 2 - HalfFieldWidth;
+        if (dbug) Log.Message("SetCurrentCameraIndex(" + newCamIdx + ") | this.offset.x(" + this.offset.x + ") = centerOffset.x(" + centerOffset.x + ") + bgCamera.w(" + bgCamera.w + ") / 2 - HalfFieldWidth(" + HalfFieldWidth + ")");
         this.offset.y = -centerOffset.y - bgCamera.h / 2 + HalfFieldHeight;
         Shader.SetGlobalFloat("_OffsetX", this.offset.x);
         Shader.SetGlobalFloat("_OffsetY", this.offset.y);
@@ -430,11 +426,17 @@ public class FieldMap : HonoBehavior
         this.flags |= FieldMapFlags.Unknown128;
         this.walkMesh.ProcessBGI();
         this.walkMesh.UpdateActiveCameraWalkmesh();
+        SmoothCamDelay = 6;
+        SmoothCamActive = (!SmoothCamExcludeMaps.Contains(FF9StateSystem.Common.FF9.fldMapNo));
+        String camIdxIfCam = this.scene.cameraList.Count > 1 ? "-" + this.camIdx : "";
+        PlayerWindow.Instance.SetTitle($"Map: {FF9StateSystem.Common.FF9.fldMapNo}{camIdxIfCam} ({FF9StateSystem.Common.FF9.mapNameStr}) | Index/Counter: {PersistenSingleton<EventEngine>.Instance.eBin.getVarManually(EBin.MAP_INDEX_SVR)}/{PersistenSingleton<EventEngine>.Instance.eBin.getVarManually(EBin.SC_COUNTER_SVR)} | Loc: {FF9StateSystem.Common.FF9.fldLocNo}");
+        if (dbug) Log.Message(" |_ SetCurrentCameraIndex | ShaderMulX: " + ShaderMulX + " | bgCamera.depthOffset: " + bgCamera.depthOffset + " | bgCamera.vrpMaxX " + bgCamera.vrpMaxX + " | bgCamera.depthOffset: " + bgCamera.depthOffset + " | this.scene.maxX: " + this.scene.maxX);
     }
 
     public static Boolean IsNarrowMap()
     {
-        return NarrowMapList.IsCurrentMapNarrow();
+        //Log.Message("NarrowMapList.IsCurrentMapNarrow((Int32)CalcPsxFieldWidth()) " + NarrowMapList.IsCurrentMapNarrow((Int32)CalcPsxFieldWidth()));
+        return NarrowMapList.IsCurrentMapNarrow((Int32)CalcPsxFieldWidth());
     }
 
     public void LoadFieldMap(String name)
@@ -452,6 +454,7 @@ public class FieldMap : HonoBehavior
         BGCAM_DEF bgCamera = this.scene.cameraList[this.camIdx];
         Vector2 centerOffset = bgCamera.GetCenterOffset();
         this.offset.x = centerOffset.x + bgCamera.w / 2 - HalfFieldWidth;
+        if (dbug) Log.Message("LoadFieldMap(" + FF9StateSystem.Common.FF9.fldMapNo + " | this.offset.x(" + this.offset.x + ") = centerOffset.x(" + centerOffset.x + ") + bgCamera.w(" + bgCamera.w + ") / 2 - HalfFieldWidth(" + HalfFieldWidth + ")");
         this.offset.y = -centerOffset.y - bgCamera.h / 2 + HalfFieldHeight;
         Shader.SetGlobalFloat("_OffsetX", this.offset.x);
         Shader.SetGlobalFloat("_OffsetY", this.offset.y);
@@ -468,8 +471,30 @@ public class FieldMap : HonoBehavior
         this.walkMesh.CreateWalkMesh();
         this.walkMesh.CreateProjectedWalkMesh();
         this.walkMesh.BGI_simInit();
+        SmoothCamDelay = 6;
+        SmoothCamActive = (!SmoothCamExcludeMaps.Contains(FF9StateSystem.Common.FF9.fldMapNo));
         FPSManager.DelayMainLoop(Time.realtimeSinceStartup - loadStartTime);
+        if (dbug) Log.Message("_ LoadFieldMap | ShaderMulX: " + ShaderMulX + " | bgCamera.depthOffset: " + bgCamera.depthOffset + " | bgCamera.vrpMaxX " + bgCamera.vrpMaxX + " | bgCamera.depthOffset: " + bgCamera.depthOffset + " | this.scene.maxX: " + this.scene.maxX);
     }
+    public static readonly HashSet<Int32> SmoothCamExcludeMaps = new HashSet<Int32>()
+    {
+        575,  // Hunting festival
+        767,  // Burmecia, the queen slides from her layer
+        1754, // Fast scroll on Iifa platform buggy
+        3000, // ending
+        3001,
+        3002,
+        3003,
+        3004,
+        3005,
+        3006,
+        3007,
+        3008,
+        3009,
+        3010,
+        3011,
+        3012,
+    };
 
     public void ActivateCamera()
     {
@@ -565,11 +590,11 @@ public class FieldMap : HonoBehavior
 
     private void SetCharScale(Actor actorOfObj, int sx, int sy, int sz)
     {
-        int num = 18;
+        int scalingFactor = 18;
         if (actorOfObj != null)
         {
             if (actorOfObj.go != null)
-                geo.geoScaleSetXYZ(actorOfObj.go, sx << 24 >> num, sy << 24 >> num, sz << 24 >> num);
+                geo.geoScaleSetXYZ(actorOfObj.go, sx << 24 >> scalingFactor, sy << 24 >> scalingFactor, sz << 24 >> scalingFactor);
             actorOfObj.scaley = (byte)sy;
         }
     }
@@ -675,21 +700,25 @@ public class FieldMap : HonoBehavior
             return;
         if (this.curCamIdx < 0 || this.curCamIdx > this.scene.cameraList.Count)
             return;
-        BGCAM_DEF bgcam_DEF = this.scene.cameraList[this.camIdx];
+        BGCAM_DEF bgCamera = this.scene.cameraList[this.camIdx];
         Vector3 localPosition = camera.transform.localPosition;
-        localPosition.x = bgcam_DEF.centerOffset[0] + this.charOffset.x;
-        localPosition.y = bgcam_DEF.centerOffset[1] - this.charOffset.y;
+        float CamPositionX = bgCamera.centerOffset[0] + this.charOffset.x;
+        float CamPositionY = bgCamera.centerOffset[1] - this.charOffset.y;
+        //Log.Message("bgCamera.centerOffset[0] begin center camera on player " + bgCamera.centerOffset[0]);
 
-        if (Configuration.Graphics.InitializeWidescreenSupport())
+        if (Configuration.Graphics.InitializeWidescreenSupport() && map != 931)
         {
-            Int32 threshmargin = Math.Min(bgcam_DEF.w - PsxFieldWidth, 0); // Offset value for fields that are between 320 & 398
-            if (!IsNarrowMap() && map != 507) // Cargo Ship/Deck
+            Int32 mapWidth = NarrowMapList.MapWidth(map);
+
+            Int32 threshmargin = Math.Min((Int32)bgCamera.w - PsxFieldWidth, 0); // Offset value for fields that are between 320 & 398
+            //if (dbug) Log.Message("PsxFieldWidth" + PsxFieldWidth);
+            if (mapWidth > PsxFieldWidth && map != 507) // Cargo Ship/Deck
             {
-                foreach (KeyValuePair<Int32, Int32> entry in mapCameraMargin)
+                foreach (KeyValuePair<Int32, Int32> entry in NarrowMapList.mapCameraMargin)
                     if (map == entry.Key)
                         threshmargin = entry.Value;
 
-                Int32 threshright = bgcam_DEF.w - PsxFieldWidth - threshmargin;
+                Int32 threshright = bgCamera.w - PsxFieldWidth - threshmargin;
 
                 if (map == 103 || map == 1853 || map == 2053 || map == 2606) // Exceptions in alex center, branbal
                     threshmargin += 16;
@@ -698,268 +727,69 @@ public class FieldMap : HonoBehavior
                 else if (map == 2923) // Exception in crystal world
                     threshmargin += 20;
 
-                localPosition.x = (Int32)Math.Max(threshmargin, localPosition.x);
-                localPosition.x = (Int32)Math.Min(threshright, localPosition.x);
+                CamPositionX = (float)Math.Max(threshmargin, CamPositionX);
+                CamPositionX = (float)Math.Min(threshright, CamPositionX);
             }
-            else if (map == 1205 || map == 1652 || map == 2552)
+            else if (map == 1205 || map == 1652 || map == 2552 || map == 154 || map == 1215 || map == 1807) // A. Castle/Chapel, Iifa Tree/Roots, Earth Shrine/Interior, Alex grand hall
             {
-                // A. Castle/Chapel, Iifa Tree/Roots or Earth Shrine/Interior
                 if (map == 1652 && this.camIdx == 0) // Iifa Tree/Roots
                     threshmargin += 16;
 
-                Int32 threshright = bgcam_DEF.w - PsxFieldWidth - threshmargin;
-                
-                localPosition.x = (Int32)Math.Max(threshmargin, localPosition.x);
-                localPosition.x = (Int32)Math.Min(threshright, localPosition.x);
+                Int32 threshright = bgCamera.w - PsxFieldWidth - threshmargin;
+
+                CamPositionX = (float)Math.Max(threshmargin, CamPositionX);
+                CamPositionX = (float)Math.Min(threshright, CamPositionX);
             }
             else if (IsNarrowMap())
             {
-                foreach (KeyValuePair<Int32, Int32> entry in actualNarrowMapWidthDict)
-                    if (map == entry.Key)
-                        localPosition.x = (Int32)((bgcam_DEF.w - entry.Value) / 2);
-                switch (map) // offsets for scrolling maps stretched to WS
+                if (mapWidth <= PsxFieldWidth && mapWidth > 320)
                 {
-                    case 456: // Dali Mountain/Summit
-                        localPosition.x = 160;
-                        break;
-                    case 505: // Cargo ship offset
-                        localPosition.x = 105;
-                        break;
-                    case 1153: // Rose Rouge cockpit offset
-                        localPosition.x = 175;
-                        break;
-                    default:
-                        break;
+                    CamPositionX = (float)((bgCamera.w - mapWidth) / 2);
                 }
             }
-            if (Configuration.Graphics.ScreenIs16to10())
+            
+            switch (map) // offsets for scrolling maps stretched to WS
             {
-                switch (map) // offsets for scrolling maps stretched to WS
-                {
-                    case 456: // Dali Mountain/Summit
-                        localPosition.x = 160 + 35;
-                        break;
-                    case 505: // Cargo ship offset
-                        localPosition.x = 105 - 35;
-                        break;
-                    case 1153: // Rose Rouge cockpit offset
-                        localPosition.x = 175 - 35;
-                        break;
-                    default:
-                        break;
-                }
+                case 456: // Dali Mountain/Summit
+                    CamPositionX = Configuration.Graphics.ScreenIs16to10() ? 195 : 160; break;
+                case 505: // Cargo ship offset
+                    CamPositionX = Configuration.Graphics.ScreenIs16to10() ? 70 : 105; break;
+                case 1153: // Rose Rouge cockpit offset
+                    CamPositionX = Configuration.Graphics.ScreenIs16to10() ? 140 : 175; break;
+                case 2716: // fix for Kuja descending camera too high
+                    CamPositionY = (float)Math.Min(0, CamPositionY); break;
+                default:
+                    break;
             }
         }
 
+        if (SmoothCamActive)
+        {
+            if (SmoothCamDelay <= 0)
+            {
+                SmoothCamDelta.x = (Prev_CamPositionX - CamPositionX) * (float)(SmoothCamPercent() / 100f);
+                CamPositionX += SmoothCamDelta.x;
+                Prev_CamPositionX = CamPositionX;
+
+                SmoothCamDelta.y = (Prev_CamPositionY - CamPositionY) * (float)(SmoothCamPercent() / 100f);
+                CamPositionY += SmoothCamDelta.y;
+                Prev_CamPositionY = CamPositionY;
+            }
+            else
+            {
+                SmoothCamDelay -= 1;
+                Prev_CamPositionX = CamPositionX;
+                Prev_CamPositionY = CamPositionY;
+            }
+        }
+            
+        localPosition.x = CamPositionX;
+        localPosition.y = CamPositionY;
+
+        if (dbug) Log.Message("CenterCameraOnPlayer | X: " + CamPositionX + " Y:" + CamPositionY);
+
         camera.transform.localPosition = localPosition;
     }
-
-
-    private static readonly Dictionary<int, int> mapCameraMargin = new Dictionary<int, int>
-    {
-        //{mapNo,pixels on each side to crop because of scrollable}
-        {1051,8},
-        {1057,16},
-        {1058,16},
-        {1060,16},
-        {1652,16},
-        {1653,16},
-    };
-
-    public static readonly Dictionary<int, int> actualNarrowMapWidthDict = new Dictionary<int, int>
-    {
-        //{mapNo,(actualWidth - 2)}
-        {203,334},
-        {502,334},
-        {503,334},
-        {760,334},
-        {814,334},
-        {816,334},
-        {1151,334},
-        {1458,334},
-        {1500,334},
-        {1506,334},
-        {1605,334},
-        {1606,334},
-        {1608,334},
-        {1660,334},
-        {1661,334},
-        {1662,334},
-        {1705,334},
-        {1707,334},
-        {1751,334},
-        {2202,334},
-        {2204,334},
-        {2205,334},
-        {2208,334},
-        {2254,334},
-        {2257,334},
-        {2303,334},
-        {2365,334},
-        {2513,334},
-        {2756,334},
-        {2932,334},
-        {3057,334},
-        {114,350},
-        {550,350},
-        {620,350},
-        {802,350},
-        {803,350},
-        {1212,350},
-        {1300,350},
-        {1370,350},
-        {1508,350},
-        {1650,350},
-        {1752,350},
-        {1757,350},
-        {1863,350},
-        {1951,350},
-        {1952,350},
-        {2000,350},
-        {2055,350},
-        {2771,350},
-        {2203,350},
-        {2261,350},
-        {2356,350},
-        {2362,350},
-        {2500,350},
-        {2501,350},
-        {2654,350},
-        {60,366},
-        {150,366},
-        {161,366},
-        {201,366},
-        {262,366},
-        {565,366},
-        {911,366},
-        {1213,366},
-        {1222,366},
-        {1251,366},
-        {1254,366},
-        {1312,366},
-        {1403,366},
-        {1803,366},
-        {1814,366},
-        {1817,366},
-        {1911,366},
-        {1953,366},
-        {2002,366},
-        {2004,366},
-        {2006,366},
-        {2112,366},
-        {2400,366},
-        {2502,366},
-        {2503,366},
-        {2650,366},
-        {2904,366},
-        {2913,366},
-        {2928,366},
-        {3100,366},
-        {102,382},
-        {109,382},
-        {162,382},
-        {206,382},
-        {207,382},
-        {251,382},
-        {252,382},
-        {407,382},
-        {553,382},
-        {556,382},
-        {705,382},
-        {751,382},
-        {813,382},
-        {950,382},
-        {1017,382},
-        {1018,382},
-        {1058,380},
-        {1108,380},
-        {1201,382},
-        {1210,382},
-        {1303,382},
-        {1404,382},
-        {1452,382},
-        {1453,382},
-        {1509,382},
-        {1656,382},
-        {1820,382},
-        {1852,382},
-        {1858,382},
-        {2052,382},
-        {2103,382},
-        {2200,382},
-        {2222,382},
-        {2355,382},
-        {2406,382},
-        {2451,382},
-        {2657,382},
-        {2851,382},
-        {2855,382},
-        {2856,382},
-        {2915,382},
-        {3052,382},
-        {55,398},
-        {157,398},
-        {405,398},
-        {456,398},
-        {505,398},
-        {561,398},
-        {566,398},
-        {568,398},
-        {569,398},
-        {571,398},
-        {613,398},
-        {656,398},
-        {657,398},
-        {658,398},
-        {659,398},
-        {663,398},
-        {753,398},
-        {755,398},
-        {806,398},
-        {851,398},
-        {855,398},
-        {901,398},
-        {913,398},
-        {1054,398},
-        {1104,398},
-        {1153,398},
-        {1218,398},
-        {1313,398},
-        {1363,398},
-        {1408,398},
-        {1414,398},
-        {1424,398},
-        {1456,398},
-        {1600,398},
-        {1601,398},
-        {1602,398},
-        {1700,398},
-        {1701,398},
-        {1702,398},
-        {1810,398},
-        {1901,398},
-        {1913,398},
-        {2113,398},
-        {2163,398},
-        {2212,398},
-        {2213,398},
-        {2352,398},
-        {2353,398},
-        {2551,398},
-        {2601,398},
-        {2658,398},
-        {2706,398},
-        {2906,398},
-        {3005,398},
-        {3055,398},
-        {1205,384},
-        {154,352},
-        {1215,352},
-        {1805,352},
-        {1807,352},
-        {1652,336},
-        {2552,352},
-    };
 
     public void ff9fieldInternalBattleEncountService()
     {
@@ -985,6 +815,7 @@ public class FieldMap : HonoBehavior
             FF9StateSystem.Field.FF9Field.attr &= 4294960870u;
             PersistenSingleton<FF9StateSystem>.Instance.attr |= 2u;
         }
+        if (dbug) Log.Message("ff9fieldInternalBattleEncountStart");
     }
 
     public void ff9fieldInternalBattleEncountStart()
@@ -996,44 +827,33 @@ public class FieldMap : HonoBehavior
         FieldMap.FF9FieldAttr.ff9[0, 0] = 67;
         FieldMap.FF9FieldAttr.ff9[0, 2] = 60;
         FieldMap.FF9FieldAttr.field[0, 2] = 6425;
+        if (dbug) Log.Message("ff9fieldInternalBattleEncountStart");
     }
 
-    private void EBG_init()
+    private void BG_init()
     {
-        this.EBG_stateInit();
-        if (this.EBG_sceneInit() != 1)
-            return;
-        this.EBG_animationInit();
-        this.EBG_attachInit();
-    }
-
-    private void EBG_stateInit()
-    {
+        // EBG_stateInit();
         this.flags = FieldMapFlags.GenericInitial;
         this.curVRP = Vector2.zero;
         this.charOffset = Vector2.zero;
         this.startPoint = Vector2.zero;
         this.endPoint = Vector2.zero;
+        this.SmoothCamDelta = Vector2.zero;
         this.curFrame = 0;
         this.prevScr = Vector2.zero;
         this.charAimHeight = 324;
-    }
 
-    private Int32 EBG_sceneInit()
-    {
-        if (FF9StateSystem.Common.FF9.fldMapNo == 70) // Opening-For FMV
-            return 0;
-        BGCAM_DEF bgcam_DEF = this.scene.cameraList[this.curCamIdx];
-        Single num = (Single)((bgcam_DEF.vrpMinX + bgcam_DEF.vrpMaxX) / 2 - bgcam_DEF.centerOffset[0]) - HalfFieldWidth;
-        Single num2 = (Single)((bgcam_DEF.vrpMinY + bgcam_DEF.vrpMaxY) / 2 + bgcam_DEF.centerOffset[1]) - HalfFieldHeight;
-        Int32 index = 0;
-        Single value = num;
-        this.parallaxOrg[0] = value;
-        this.curVRP[index] = value;
-        Int32 index2 = 1;
-        value = num2;
-        this.parallaxOrg[1] = value;
-        this.curVRP[index2] = value;
+        if (FF9StateSystem.Common.FF9.fldMapNo == 70) // Opening-For FMV)
+            return;
+
+        // EBG_stateInit()
+        BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
+        Single centerOffsetX = (Single)((bgCamera.vrpMinX + bgCamera.vrpMaxX) / 2 - bgCamera.centerOffset[0]) - HalfFieldWidth;
+        Single centerOffsetY = (Single)((bgCamera.vrpMinY + bgCamera.vrpMaxY) / 2 + bgCamera.centerOffset[1]) - HalfFieldHeight;
+        this.parallaxOrg.x = centerOffsetX;
+        this.curVRP.x = centerOffsetX;
+        this.parallaxOrg.y = centerOffsetY;
+        this.curVRP.y = centerOffsetY;
         this.scrollWindowPos = new Int16[4][];
         this.scrollWindowDim = new Int16[4][];
         this.scrollWindowAlphaX = new Int16[4];
@@ -1041,19 +861,15 @@ public class FieldMap : HonoBehavior
         for (Int32 i = 0; i < 4; i++)
         {
             this.scrollWindowPos[i] = new Int16[2];
-            this.scrollWindowDim[i] = new Int16[2];
             this.scrollWindowPos[i][0] = 0;
             this.scrollWindowPos[i][1] = 0;
-            this.scrollWindowDim[i][0] = bgcam_DEF.w;
-            this.scrollWindowDim[i][1] = bgcam_DEF.h;
+            this.scrollWindowDim[i] = new Int16[2];
+            this.scrollWindowDim[i][0] = bgCamera.w;
+            this.scrollWindowDim[i][1] = bgCamera.h;
             this.scrollWindowAlphaX[i] = 256;
             this.scrollWindowAlphaY[i] = 256;
         }
-        return 1;
-    }
-
-    private Int32 EBG_animationInit()
-    {
+        // EBG_animationInit();
         List<BGANIM_DEF> animList = this.scene.animList;
         List<BGOVERLAY_DEF> overlayList = this.scene.overlayList;
         Int32 animCount = this.scene.animCount;
@@ -1067,11 +883,7 @@ public class FieldMap : HonoBehavior
             List<BGANIMFRAME_DEF> frameList = bgAnim.frameList;
             overlayList[frameList[0].target].SetFlags(BGOVERLAY_DEF.OVERLAY_FLAG.Active, true);
         }
-        return 1;
-    }
-
-    public Int32 EBG_attachInit()
-    {
+        // EBG_attachInit();
         this.attachCount = 0;
         for (Int32 i = 0; i < 10; i++)
         {
@@ -1084,7 +896,7 @@ public class FieldMap : HonoBehavior
             this.attachList[i].x = 0;
             this.attachList[i].y = 0;
         }
-        return 1;
+        if (dbug) Log.Message("EBG_init()");
     }
 
     public Int32 EBG_sceneGetVRP(ref Int16 x, ref Int16 y)
@@ -1092,8 +904,9 @@ public class FieldMap : HonoBehavior
         if (this.scene.cameraList.Count <= 0)
             return 0;
         BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
-        x = (Int16)(this.curVRP[0] + bgCamera.centerOffset[0] + HalfFieldWidth);
-        y = (Int16)(this.curVRP[1] - bgCamera.centerOffset[1] + HalfFieldHeight);
+        x = (Int16)(this.curVRP.x + bgCamera.centerOffset[0] + HalfFieldWidth);
+        y = (Int16)(this.curVRP.y - bgCamera.centerOffset[1] + HalfFieldHeight);
+        //Log.Message("EBG_sceneGetVRP curVRP" + x);
         return 1;
     }
 
@@ -1106,6 +919,11 @@ public class FieldMap : HonoBehavior
 
     public Int32 EBG_overlayDefineViewport(Int32 viewportNdx, Int16 x, Int16 y, Int16 w, Int16 h)
     {
+        if (dbug) Log.Message("EBG_overlayDefineViewport " + viewportNdx + " | x:" + x + " y:" + y + " w:" + w + " h:" + h);
+
+        if (!(viewportNdx >= 0 && viewportNdx < 4))
+            viewportNdx = 0;
+
         this.scrollWindowPos[viewportNdx][0] = x;
         this.scrollWindowPos[viewportNdx][1] = y;
         this.scrollWindowDim[viewportNdx][0] = w;
@@ -1115,6 +933,7 @@ public class FieldMap : HonoBehavior
 
     public Int32 EBG_overlayDefineViewportAlpha(Int32 viewportNdx, Int32 alphaX, Int32 alphaY)
     {
+        if (dbug) Log.Message("EBG_overlayDefineViewportAlpha " + viewportNdx + " | alphaX:" + alphaX + " alphaY:" + alphaY);
         this.scrollWindowAlphaX[viewportNdx] = (Int16)alphaX;
         this.scrollWindowAlphaY[viewportNdx] = (Int16)alphaY;
         return 1;
@@ -1124,6 +943,8 @@ public class FieldMap : HonoBehavior
     {
         BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
         bgOverlay.viewportNdx = (Byte)viewportNdx;
+
+        if (dbug) Log.Message("EBG_overlaySetViewport | overlayNdx:" + overlayNdx + " viewportNdx:" + bgOverlay.viewportNdx);
         return 1;
     }
 
@@ -1132,18 +953,19 @@ public class FieldMap : HonoBehavior
         BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
         if (flag != 0u)
         {
+            //SmoothCamActive = false;
             bgOverlay.flags |= BGOVERLAY_DEF.OVERLAY_FLAG.Loop;
             if (this.scene.combineMeshes)
                 this.scene.CreateSeparateOverlay(this, this.UseUpscalFM, overlayNdx);
+            if (dbug) Log.Message("EBG_overlaySetLoop " + overlayNdx + " | loop | dx:" + dx + " dy:" + dy);
         }
         else
         {
             bgOverlay.flags &= ~BGOVERLAY_DEF.OVERLAY_FLAG.Loop;
+            if (dbug) Log.Message("EBG_overlaySetLoop " + overlayNdx + " | noloop | dx:" + dx + " dy:" + dy);
         }
-        bgOverlay.dX = (Int16)dx;
-        bgOverlay.fracX = 0;
-        bgOverlay.dY = (Int16)dy;
-        bgOverlay.fracY = 0;
+        bgOverlay.scrollX = (Int16)dx;
+        bgOverlay.scrollY = (Int16)dy;
         return 1;
     }
 
@@ -1151,9 +973,16 @@ public class FieldMap : HonoBehavior
     {
         BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
         if (isScreenAnchored != 0u)
+        {
+            if (dbug) Log.Message("EBG_overlaySetLoopType " + overlayNdx + " | + ScreenAnchored");
             bgOverlay.flags |= BGOVERLAY_DEF.OVERLAY_FLAG.ScreenAnchored;
+        }
         else
+        {
+            if (dbug) Log.Message("EBG_overlaySetLoopType " + overlayNdx + " | - ScreenAnchored");
             bgOverlay.flags &= ~BGOVERLAY_DEF.OVERLAY_FLAG.ScreenAnchored;
+        }
+            
         return 1;
     }
 
@@ -1162,39 +991,44 @@ public class FieldMap : HonoBehavior
         BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
         if (flag != 0u)
         {
+            if (dbug) Log.Message("EBG_overlaySetScrollWithOffset " + overlayNdx + " | ScrollWithOffset");
             bgOverlay.flags |= BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset;
+            //SmoothCamActive = false;
             if (this.scene.combineMeshes)
                 this.scene.CreateSeparateOverlay(this, this.UseUpscalFM, overlayNdx);
         }
         else
         {
+            if (dbug) Log.Message("EBG_overlaySetScrollWithOffset " + overlayNdx + " | not ScrollWithOffset");
             bgOverlay.flags &= ~BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset;
         }
         if (isXOffset != 0u)
         {
-            bgOverlay.dX = (Int16)offset;
-            bgOverlay.dY = (Int16)delta;
+            if (dbug) Log.Message("EBG_overlaySetScrollWithOffset " + overlayNdx + " | isXOffset");
+            bgOverlay.scrollX = (Int16)offset;
+            bgOverlay.scrollY = (Int16)delta;
             bgOverlay.isXOffset = 1;
         }
         else
         {
-            bgOverlay.dX = (Int16)delta;
-            bgOverlay.dY = (Int16)offset;
+            if (dbug) Log.Message("EBG_overlaySetScrollWithOffset " + overlayNdx + " | not isXOffset");
+            bgOverlay.scrollX = (Int16)delta;
+            bgOverlay.scrollY = (Int16)offset;
             bgOverlay.isXOffset = 0;
         }
-        bgOverlay.fracX = 0;
-        bgOverlay.fracY = 0;
         return 1;
     }
 
     public Int32 EBG_charAttachOverlay(Int32 overlayNdx, Int16 attachX, Int16 attachY, SByte surroundMode, Byte r, Byte g, Byte b)
     {
+        if (dbug) Log.Message("EBG_charAttachOverlay " + overlayNdx + " | attachX:" + attachX + " attachY:" + attachY);
         this.attachList[this.attachCount].ndx = (Int16)overlayNdx;
         this.attachList[this.attachCount].x = attachX;
         this.attachList[this.attachCount].y = attachY;
         this.attachList[this.attachCount].surroundMode = surroundMode;
         if (surroundMode >= 0)
         {
+            if (dbug) Log.Message(" |_ EBG_charAttachOverlay surroundMode: RGB:" + r + g + b);
             this.attachList[this.attachCount].r = r;
             this.attachList[this.attachCount].g = g;
             this.attachList[this.attachCount].b = b;
@@ -1206,6 +1040,7 @@ public class FieldMap : HonoBehavior
 
     public Int32 EBG_animAnimate(Int32 animNdx, Int32 frameNdx)
     {
+        if (dbug) Log.Message("EBG_animAnimate | anim:" + animNdx + " frame:" + frameNdx);
         BGANIM_DEF bgAnim = this.scene.animList[animNdx];
         bgAnim.flags |= BGANIM_DEF.ANIM_FLAG.Animate;
         bgAnim.curFrame = frameNdx << 8;
@@ -1215,6 +1050,7 @@ public class FieldMap : HonoBehavior
 
     public Int32 EBG_animShowFrame(Int32 animNdx, Int32 frameNdx)
     {
+        if (dbug) Log.Message("EBG_animShowFrame | anim:" + animNdx + " frame:" + frameNdx);
         BGANIM_DEF bgAnim = this.scene.animList[animNdx];
         List<BGANIMFRAME_DEF> frameList = bgAnim.frameList;
         List<BGOVERLAY_DEF> overlayList = this.scene.overlayList;
@@ -1228,31 +1064,30 @@ public class FieldMap : HonoBehavior
     {
         BGANIM_DEF bgAnim = this.scene.animList[animNdx];
         if (flag != 0)
+        {
+            if (dbug) Log.Message("EBG_animSetActive | PLAY anim:" + animNdx);
             bgAnim.flags |= BGANIM_DEF.ANIM_FLAG.StartPlay;
+        }
         else
+        {
+            if (dbug) Log.Message("EBG_animSetActive | STOP anim:" + animNdx);
             bgAnim.flags &= ~BGANIM_DEF.ANIM_FLAG.StartPlay;
+        }
         return 1;
     }
 
     public Int32 EBG_animSetFrameRate(Int32 animNdx, Int32 frameRate)
     {
+        if (dbug) Log.Message("EBG_animSetFrameRate | anim:" + animNdx + " frameRate:" + frameRate);
         BGANIM_DEF bgAnim = this.scene.animList[animNdx];
         bgAnim.frameRate = (Int16)frameRate;
         bgAnim.CalculateActualFrameCount();
         return 1;
     }
 
-    public Int32 EBG_animSetFrameWaitAll(Int32 animNdx, Int32 frameWait)
-    {
-        BGANIM_DEF bgAnim = this.scene.animList[animNdx];
-        List<BGANIMFRAME_DEF> frameList = bgAnim.frameList;
-        for (Int32 i = 0; i < bgAnim.frameCount; i++)
-            frameList[i].value = (SByte)frameWait;
-        return 1;
-    }
-
     public Int32 EBG_animSetFrameWait(Int32 animNdx, Int32 frameNdx, Int32 frameWait)
     {
+        if (dbug) Log.Message("EBG_animSetFrameWait | anim:" + animNdx + " frame:" + frameNdx + " frameWait:" + frameWait);
         BGANIM_DEF bgAnim = this.scene.animList[animNdx];
         List<BGANIMFRAME_DEF> frameList = bgAnim.frameList;
         frameList[frameNdx].value = (SByte)frameWait;
@@ -1261,6 +1096,7 @@ public class FieldMap : HonoBehavior
 
     public Int32 EBG_animSetFlags(Int32 animNdx, Int32 flags)
     {
+        if (dbug) Log.Message("EBG_animSetFlags " + animNdx + " | flags:" + flags);
         BGANIM_DEF bgAnim = this.scene.animList[animNdx];
         bgAnim.flags |= (BGANIM_DEF.ANIM_FLAG)flags & BGANIM_DEF.ANIM_FLAG.Modifiables;
         return 1;
@@ -1268,6 +1104,7 @@ public class FieldMap : HonoBehavior
 
     public Int32 EBG_animSetPlayRange(Int32 animNdx, Int32 frameStart, Int32 frameEnd)
     {
+        if (dbug) Log.Message("EBG_animSetPlayRange " + animNdx + " | frames: " + frameStart + " to " + frameEnd);
         BGANIM_DEF bgAnim = this.scene.animList[animNdx];
         List<BGANIMFRAME_DEF> frameList = bgAnim.frameList;
         bgAnim.flags |= BGANIM_DEF.ANIM_FLAG.StartPlay;
@@ -1281,6 +1118,7 @@ public class FieldMap : HonoBehavior
 
     public Int32 EBG_animSetVisible(Int32 animNdx, Int32 isVisible)
     {
+        if (dbug) Log.Message("EBG_animSetVisible | anim:"+ animNdx + " Visible:" + (isVisible != 0));
         BGANIM_DEF bgAnim = this.scene.animList[animNdx];
         List<BGANIMFRAME_DEF> frameList = bgAnim.frameList;
         List<BGOVERLAY_DEF> overlayList = this.scene.overlayList;
@@ -1300,19 +1138,15 @@ public class FieldMap : HonoBehavior
         bgCamera.vrpMaxX = (Int16)Math.Max(maxX - HalfFieldWidthNative, HalfFieldWidthNative);
         bgCamera.vrpMinY = (Int16)Math.Min(minY + HalfFieldHeight, bgCamera.h - HalfFieldHeight);
         bgCamera.vrpMaxY = (Int16)Math.Max(maxY - HalfFieldHeight, HalfFieldHeight);
+        if (dbug) Log.Message("EBG_cameraSetViewport | vrpMinX:" + bgCamera.vrpMinX + " vrpMaxX:" + bgCamera.vrpMaxX + " vrpMinY:" + bgCamera.vrpMinY + " vrpMaxY:" + bgCamera.vrpMaxY);
         return 1;
-    }
-
-    public bool EBG_isCombineMesh(BGOVERLAY_DEF overlayPtr)
-    {
-        return overlayPtr.transform.GetComponent<MeshRenderer>() != null;
     }
 
     public Int32 EBG_overlaySetShadeColor(Int32 overlayNdx, Byte r, Byte g, Byte b)
     {
         BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
         List<BGSPRITE_LOC_DEF> spriteList = bgOverlay.spriteList;
-        if (this.EBG_isCombineMesh(bgOverlay))
+        if (bgOverlay.transform.GetComponent<MeshRenderer>() != null) //EBG_isCombineMesh
         {
             Material material = bgOverlay.transform.gameObject.GetComponent<MeshRenderer>().material;
             material.SetColor("_Color", new Color(r / 128f, g / 128f, b / 128f, 1f));
@@ -1320,6 +1154,7 @@ public class FieldMap : HonoBehavior
         }
         else if (spriteList.Count > 0)
         {
+            //if (dbug) Log.Message("EBG_overlaySetShadeColor | !EBG_isCombineMesh(bgOverlay) && (spriteList.Count > 0)");
             Material material = spriteList[0].transform.gameObject.GetComponent<MeshRenderer>().material;
             Int32 spriteCount = bgOverlay.spriteCount;
             Int32 indexShift = FF9StateSystem.Common.FF9.id != 0 ? spriteCount : 0;
@@ -1327,6 +1162,7 @@ public class FieldMap : HonoBehavior
             for (Int32 i = 0; i < spriteCount; i++)
                 spriteList[i + indexShift].transform.gameObject.GetComponent<MeshRenderer>().material = material;
         }
+        if (dbug) Log.Message("EBG_overlaySetShadeColor " + overlayNdx + " | RGB:" + r + g + b);
         return 1;
     }
 
@@ -1334,12 +1170,12 @@ public class FieldMap : HonoBehavior
     {
         BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
         FieldMapInfo.fieldmapExtraOffset.UpdateOverlayOffset(this.mapName, overlayNdx, ref dz);
-        Int16 destX = (Int16)Mathf.Clamp(bgOverlay.orgX + dx, bgOverlay.minX, bgOverlay.maxX);
-        Int16 destY = (Int16)Mathf.Clamp(bgOverlay.orgY + dy, bgOverlay.minY, bgOverlay.maxY);
+        float destX = (float)Mathf.Clamp(bgOverlay.orgX + dx, bgOverlay.minX, bgOverlay.maxX);
+        float destY = (float)Mathf.Clamp(bgOverlay.orgY + dy, bgOverlay.minY, bgOverlay.maxY);
 
         // TODO Check Native: #147
         UInt16 destZ;
-        if (FF9StateSystem.Common.FF9.fldMapNo == 2351 && overlayNdx >= 3 && overlayNdx <= 17)
+        if (FF9StateSystem.Common.FF9.fldMapNo == 2351 && overlayNdx >= 3 && overlayNdx <= 17) // official fix of the mine bucket
             destZ = 3000;
         else
             destZ = (UInt16)(bgOverlay.orgZ + (UInt16)dz);
@@ -1351,17 +1187,19 @@ public class FieldMap : HonoBehavior
         bgOverlay.curY = destY;
         bgOverlay.curZ = destZ;
         bgOverlay.transform.localPosition = new Vector3(destX, destY, destZ);
+        if (dbug) Log.Message("EBG_overlayMove " + overlayNdx + " | destX:" + destX + " destY:" + destY + " destZ:" + destZ);
         return 1;
     }
 
     public Int32 EBG_overlaySetOrigin(Int32 overlayNdx, Int32 orgX, Int32 orgY)
     {
         BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
-        bgOverlay.curX = (Int16)orgX;
-        bgOverlay.curY = (Int16)orgY;
-        bgOverlay.orgX = bgOverlay.curX;
-        bgOverlay.orgY = bgOverlay.curY;
+        bgOverlay.curX = (float)orgX;
+        bgOverlay.curY = (float)orgY;
+        bgOverlay.orgX = (float)orgX;
+        bgOverlay.orgY = (float)orgY;
         this.flags |= FieldMapFlags.Unknown128;
+        if (dbug) Log.Message("EBG_overlaySetOrigin " + overlayNdx + " | orgX:" + orgX + " orgY:" + orgY);
         return 1;
     }
 
@@ -1369,11 +1207,17 @@ public class FieldMap : HonoBehavior
     {
         BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
         if (flag != 0u)
+        {
+            if (dbug) Log.Message("EBG_overlaySetParallax " + overlayNdx + " | + Parallax | dx:" + dx + " dy:" + dy);
             bgOverlay.flags |= BGOVERLAY_DEF.OVERLAY_FLAG.Parallax;
+        }
         else
+        {
+            if (dbug) Log.Message("EBG_overlaySetParallax " + overlayNdx + " | - Parallax | dx:" + dx + " dy:" + dy);
             bgOverlay.flags &= BGOVERLAY_DEF.OVERLAY_FLAG.Parallax;
-        bgOverlay.dX = (Int16)dx;
-        bgOverlay.dY = (Int16)dy;
+        }
+        bgOverlay.scrollX = (Int16)dx;
+        bgOverlay.scrollY = (Int16)dy;
         return 1;
     }
 
@@ -1383,258 +1227,276 @@ public class FieldMap : HonoBehavior
             return;
         BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
         Vector2 realVrp = new Vector2();
-        realVrp[0] = this.curVRP[0] + bgCamera.centerOffset[0] + HalfFieldWidth;
-        realVrp[1] = this.curVRP[1] - bgCamera.centerOffset[1] + HalfFieldHeight;
-        this.scene.scrX = (Int16)(this.scene.curX + HalfFieldWidth - realVrp[0]);
-        this.scene.scrY = (Int16)(this.scene.curY + HalfFieldHeight - realVrp[1]);
+        realVrp.x = this.curVRP.x + bgCamera.centerOffset[0] + HalfFieldWidth;
+        realVrp.y = this.curVRP.y - bgCamera.centerOffset[1] + HalfFieldHeight;
+        this.scene.scrX = this.scene.curX + HalfFieldWidth - realVrp.x;
+        this.scene.scrY = this.scene.curY + HalfFieldHeight - realVrp.y;
         List<BGOVERLAY_DEF> overlayList = this.scene.overlayList;
         for (int i = 0; i < this.scene.overlayCount; i++)
-            this.UpdateOverlay(i, overlayList[i], realVrp);
+        {
+            try
+            {
+                this.UpdateOverlay(i, overlayList[i], realVrp);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e);
+            }
+        }
     }
 
-    private void UpdateOverlay(Int32 ovrNdx, BGOVERLAY_DEF overlayPtr, Vector2 realVrp)
+    private void UpdateOverlay(Int32 ovrNdx, BGOVERLAY_DEF bgOverlay, Vector2 realVrp)
     {
+        //if (dbug && ovrNdx == 24) Log.Message("before: overlayPtr.curX:" + overlayPtr.curX);
         BGSCENE_DEF bgScene = this.scene;
-        ushort spriteCount = overlayPtr.spriteCount;
-        List<BGSPRITE_LOC_DEF> spriteList = overlayPtr.spriteList;
-        short num = (short)(overlayPtr.curX + bgScene.scrX);
-        short num2 = (short)(overlayPtr.curY + bgScene.scrY);
-        short num3 = (short)(overlayPtr.curZ + (ushort)bgScene.curZ);
-        if ((overlayPtr.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Loop) != 0)
+        ushort spriteCount = bgOverlay.spriteCount;
+        List<BGSPRITE_LOC_DEF> spriteList = bgOverlay.spriteList;
+        float screenX = bgOverlay.curX + bgScene.scrX;
+        float screenY = bgOverlay.curY + bgScene.scrY;
+        if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Loop) != 0)
         {
-            short num4;
-            short num5;
-            if ((overlayPtr.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScreenAnchored) != 0)
+            //if (dbug) Log.Message("UpdateOverlay | BGOVERLAY_DEF.OVERLAY_FLAG.Loop"); // example: scrolling sky 505
+            float anchorX;
+            float anchorY;
+            if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScreenAnchored) != 0)
             {
-                num4 = this.scrollWindowPos[(int)overlayPtr.viewportNdx][0];
-                num5 = this.scrollWindowPos[(int)overlayPtr.viewportNdx][1];
+                anchorX = this.scrollWindowPos[(int)bgOverlay.viewportNdx][0];
+                anchorY = this.scrollWindowPos[(int)bgOverlay.viewportNdx][1];
+                if (dbug) Log.Message("UpdateOverlay " + ovrNdx + " | Loop ScreenAnchored anchorX:" + anchorX + " anchorY:" + anchorY);
             }
             else
             {
-                num4 = (short)(HalfFieldWidth - realVrp[0] + (float)this.scrollWindowPos[(int)overlayPtr.viewportNdx][0]);
-                num5 = (short)(HalfFieldHeight - realVrp[1] + (float)this.scrollWindowPos[(int)overlayPtr.viewportNdx][1]);
+                anchorX = (float)(HalfFieldWidth - realVrp.x + this.scrollWindowPos[(int)bgOverlay.viewportNdx][0]);
+                anchorY = (float)(HalfFieldHeight - realVrp.y + this.scrollWindowPos[(int)bgOverlay.viewportNdx][1]);
             }
-            short num6 = this.scrollWindowDim[(int)overlayPtr.viewportNdx][0];
-            short num7 = this.scrollWindowDim[(int)overlayPtr.viewportNdx][1];
-            if (overlayPtr.dX < 0)
+            if (bgOverlay.scrollX != 0)
             {
-                short num8 = (short)(256 - (overlayPtr.dX << 8 >> 8));
-                num = (short)((((int)overlayPtr.curX << 8 | (int)overlayPtr.fracX) + (int)num8 >> 8) + (int)bgScene.scrX);
-            }
-            if (overlayPtr.dY < 0)
-            {
-                short num9 = (short)(256 - (overlayPtr.dX << 8 >> 8));
-                num2 = (short)((((int)overlayPtr.curY << 8 | (int)overlayPtr.fracY) + (int)num9 >> 8) + (int)bgScene.scrY);
-            }
-            if (overlayPtr.dX != 0)
-            {
-                num = (short)((num - (num6 - (short)overlayPtr.w)) % (short)overlayPtr.w + (num6 - (short)overlayPtr.w));
-            }
-            if (overlayPtr.dY != 0)
-            {
-                num2 = (short)((num2 - (num7 - (short)overlayPtr.h)) % (short)overlayPtr.h + (num7 - (short)overlayPtr.h));
-            }
-            bool flag = this.mapName == "FBG_N18_GTRE_MAP360_GT_GRD_0";
-            for (short num10 = 0; num10 < (short)spriteCount; num10 = (short)(num10 + 1))
-            {
-                BGSPRITE_LOC_DEF bgsprite_LOC_DEF = spriteList[(int)num10];
-                Vector3 cacheLocalPos = bgsprite_LOC_DEF.cacheLocalPos;
-                if ((overlayPtr.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScreenAnchored) != 0)
+                if (bgOverlay.scrollX < 0)
                 {
-                    short num11 = (short)(num + (short)bgsprite_LOC_DEF.offX);
-                    if (overlayPtr.dX != 0)
+                    short deltaX = (short)(256 - ((short)(bgOverlay.scrollX) << 8 >> 8));
+                    screenX = (float)((((int)bgOverlay.curX << 8) + (int)deltaX >> 8) + (int)bgScene.scrX);
+                }
+                screenX = (float)((screenX - (this.scrollWindowDim[(int)bgOverlay.viewportNdx][0] - (float)bgOverlay.w)) % (float)bgOverlay.w + (this.scrollWindowDim[(int)bgOverlay.viewportNdx][0] - (float)bgOverlay.w));
+            }
+            if (bgOverlay.scrollY != 0)
+            {
+                if (bgOverlay.scrollY < 0)
+                {
+                    short deltaY = (short)(256 - ((short)(bgOverlay.scrollX) << 8 >> 8));
+                    screenY = (float)((((int)bgOverlay.curY << 8) + (int)deltaY >> 8) + (int)bgScene.scrY);
+                }
+                screenY = (float)((screenY - (this.scrollWindowDim[(int)bgOverlay.viewportNdx][1] - (float)bgOverlay.h)) % (float)bgOverlay.h + (this.scrollWindowDim[(int)bgOverlay.viewportNdx][1] - (float)bgOverlay.h));
+            }
+            
+            for (short i = 0; i < spriteCount; i++)
+            {
+                BGSPRITE_LOC_DEF bgSprite = spriteList[i];
+                Vector3 cacheLocalPos = bgSprite.cacheLocalPos;
+                float anchoredX = screenX + bgSprite.offX;
+                float anchoredY = screenY + bgSprite.offY;
+                if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScreenAnchored) != 0)
+                {
+                    //if (dbug) Log.Message("UpdateOverlay " + ovrNdx + " | ScreenAnchored"); // example: 507, 931, 951
+                    if (bgOverlay.scrollX != 0) // is moving on X axis
                     {
-                        if (num11 + 16 >= (short)overlayPtr.w)
+                        if (anchoredX + 16f - SmoothCamDelta.x >= bgOverlay.w)
                         {
-                            num11 = (short)(num11 - (short)overlayPtr.w);
+                            anchoredX -= bgOverlay.w;
                         }
-                        else if (num11 <= -16)
+                        else if (anchoredX - SmoothCamDelta.x <= -16f)
                         {
-                            num11 = (short)(num11 + (short)overlayPtr.w);
+                            anchoredX += bgOverlay.w;
                         }
                     }
-                    short num12 = (short)(num2 + (short)bgsprite_LOC_DEF.offY);
-                    if (overlayPtr.dY != 0)
+                    if (bgOverlay.scrollY != 0) // is moving on Y axis
                     {
-                        if (num12 + 16 >= (short)overlayPtr.h)
+                        if (anchoredY + 16f + SmoothCamDelta.y >= bgOverlay.h)
                         {
-                            num12 = (short)(num12 - (short)overlayPtr.h);
+                            anchoredY -= bgOverlay.h;
                         }
-                        else if (num12 <= -16)
+                        else if (anchoredY + SmoothCamDelta.y <= -16f)
                         {
-                            num12 = (short)(num12 + (short)overlayPtr.h);
+                            anchoredY += bgOverlay.h;
                         }
                     }
-                    cacheLocalPos.x = (float)(num11 + num4);
-                    cacheLocalPos.y = (float)(num12 + num5);
+                    cacheLocalPos.x = anchoredX + anchorX;
+                    cacheLocalPos.y = anchoredY + anchorY;
                 }
                 else
                 {
-                    short num11 = (short)(num + (short)bgsprite_LOC_DEF.offX);
-                    if (overlayPtr.dX != 0)
+                    //if (dbug) Log.Message("UpdateOverlay " + ovrNdx + " | not enchored"); // example: 507, 931, 951
+                    if (bgOverlay.scrollX != 0)
                     {
-                        if (num11 + 16 >= (short)overlayPtr.w)
+                        if (anchoredX + 16f >= bgOverlay.w) // - SmoothCamDelta.x
                         {
-                            num11 = (short)(num11 - (short)overlayPtr.w);
+                            anchoredX -= bgOverlay.w;
                         }
-                        else if (num11 <= -16)
+                        else if (anchoredX <= -16f) // + SmoothCamDelta.x)
                         {
-                            num11 = (short)(num11 + (short)overlayPtr.w);
+                            anchoredX += bgOverlay.w;
                         }
-                        cacheLocalPos.x = (float)(num11 + num4);
+                        cacheLocalPos.x = anchoredX + anchorX;
                     }
                     else
                     {
-                        cacheLocalPos.x = (float)num11;
+                        cacheLocalPos.x = anchoredX;
                     }
-                    short num12 = (short)(num2 + (short)bgsprite_LOC_DEF.offY);
-                    if (overlayPtr.dY != 0)
+                    if (bgOverlay.scrollY != 0)
                     {
-                        if (num12 + 16 >= (short)overlayPtr.h)
+                        if (anchoredY + 16f >= (short)bgOverlay.h) // - SmoothCamDelta.y
                         {
-                            num12 = (short)(num12 - (short)overlayPtr.h);
+                            anchoredY -= bgOverlay.h;
                         }
-                        else if (num12 <= -16)
+                        else if (anchoredY <= -16f) // + SmoothCamDelta.y)
                         {
-                            num12 = (short)(num12 + (short)overlayPtr.h);
+                            anchoredY += bgOverlay.h;
                         }
-                        cacheLocalPos.y = (float)(num12 + num5);
+                        cacheLocalPos.y = anchoredY + anchorY;
                     }
                     else
                     {
-                        cacheLocalPos.y = (float)num12;
+                        cacheLocalPos.y = anchoredY;
                     }
                 }
                 cacheLocalPos.y += 16f;
-                if (flag)
-                {
+                if (this.mapName == "FBG_N18_GTRE_MAP360_GT_GRD_0") // map 1000
                     cacheLocalPos.x += 8f;
-                }
-                cacheLocalPos.x -= (float)(this.scene.scrX + overlayPtr.curX);
-                cacheLocalPos.y -= (float)(this.scene.scrY + overlayPtr.curY);
-                bgsprite_LOC_DEF.cacheLocalPos = cacheLocalPos;
-                bgsprite_LOC_DEF.transform.localPosition = cacheLocalPos;
+                cacheLocalPos.x -= (this.scene.scrX + bgOverlay.curX);
+                cacheLocalPos.y -= (this.scene.scrY + bgOverlay.curY);
+                bgSprite.cacheLocalPos = cacheLocalPos;
+                bgSprite.transform.localPosition = cacheLocalPos;
             }
-            overlayPtr.transform.localPosition = new Vector3((float)overlayPtr.curX * 1f, (float)overlayPtr.curY * 1f, overlayPtr.transform.localPosition.z);
+            bgOverlay.transform.localPosition = new Vector3((float)bgOverlay.curX, (float)bgOverlay.curY, bgOverlay.transform.localPosition.z);
         }
-        else if ((overlayPtr.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset) != 0)
+        else if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset) != 0)
         {
-            short num4;
-            short num5;
-            if ((overlayPtr.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScreenAnchored) != 0)
+            if (dbug) Log.Message("UpdateOverlay | BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset - current map: " + FF9StateSystem.Common.FF9.fldMapNo);
+            float anchorX;
+            float anchorY;
+            if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScreenAnchored) != 0)
             {
-                num4 = this.scrollWindowPos[(int)overlayPtr.viewportNdx][0];
-                num5 = this.scrollWindowPos[(int)overlayPtr.viewportNdx][1];
+                anchorX = this.scrollWindowPos[(int)bgOverlay.viewportNdx][0];
+                anchorY = this.scrollWindowPos[(int)bgOverlay.viewportNdx][1];
+                //if (dbug) Log.Message("UpdateOverlay | BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset | anchorX:" + anchorX + " anchorY:" + anchorY);
             }
             else
             {
-                num4 = (short)(HalfFieldWidth - realVrp[0] + (float)this.scrollWindowPos[(int)overlayPtr.viewportNdx][0]);
-                num5 = (short)(HalfFieldHeight - realVrp[1] + (float)this.scrollWindowPos[(int)overlayPtr.viewportNdx][1]);
+                anchorX = HalfFieldWidth - realVrp.x + this.scrollWindowPos[(int)bgOverlay.viewportNdx][0];
+                anchorY = HalfFieldHeight - realVrp.y + this.scrollWindowPos[(int)bgOverlay.viewportNdx][0];
             }
-            short num6 = this.scrollWindowDim[(int)overlayPtr.viewportNdx][0];
-            short num7 = this.scrollWindowDim[(int)overlayPtr.viewportNdx][1];
-            if (overlayPtr.isXOffset != 0)
+            if (bgOverlay.isXOffset != 0)
             {
-                num2 = (short)((num2 - (num7 - (short)overlayPtr.h)) % (short)overlayPtr.h + (num7 - (short)overlayPtr.h));
-                num = (short)(num + num2 * overlayPtr.dX / (short)overlayPtr.h % (short)overlayPtr.w);
+                screenY = (screenY - (this.scrollWindowDim[(int)bgOverlay.viewportNdx][1] - (short)bgOverlay.h)) % (short)bgOverlay.h + (this.scrollWindowDim[(int)bgOverlay.viewportNdx][1] - (short)bgOverlay.h);
+                screenX = screenX + screenY * bgOverlay.scrollX / (short)bgOverlay.h % (short)bgOverlay.w;
             }
             else
             {
-                num = (short)((num - (num6 - (short)overlayPtr.w)) % (short)overlayPtr.w + (num6 - (short)overlayPtr.w));
-                num2 = (short)(num2 + num * overlayPtr.dY / (short)overlayPtr.w % (short)overlayPtr.h);
+                screenX = (screenX - (this.scrollWindowDim[(int)bgOverlay.viewportNdx][0] - (short)bgOverlay.w)) % (short)bgOverlay.w + (this.scrollWindowDim[(int)bgOverlay.viewportNdx][0] - (short)bgOverlay.w);
+                screenY = screenY + screenX * bgOverlay.scrollY / (short)bgOverlay.w % (short)bgOverlay.h;
             }
-            for (short num10 = 0; num10 < (short)spriteCount; num10 = (short)(num10 + 1))
+            for (short i = 0; i < spriteCount; i++)
             {
-                BGSPRITE_LOC_DEF bgsprite_LOC_DEF2 = spriteList[(int)num10];
-                Vector3 localPosition = bgsprite_LOC_DEF2.transform.localPosition;
-                if (overlayPtr.isXOffset != 0)
+                BGSPRITE_LOC_DEF bgSprite = spriteList[i];
+                Vector3 localPosition = bgSprite.transform.localPosition;
+                if (bgOverlay.isXOffset != 0)
                 {
-                    short num13 = 0;
-                    short num14 = (short)(num2 + (short)bgsprite_LOC_DEF2.offY);
-                    if (num14 + 16 >= (short)overlayPtr.h)
+                    float xOffset = 0;
+                    float yOffset = screenY + bgSprite.offY;
+                    if (yOffset + 16 >= (short)bgOverlay.h)
                     {
-                        num14 = (short)(num14 - (short)overlayPtr.h);
-                        num13 = (short)(-overlayPtr.dX);
+                        yOffset = yOffset - bgOverlay.h;
+                        xOffset = -bgOverlay.scrollX;
                     }
-                    else if (num14 <= -16)
+                    else if (yOffset <= -16)
                     {
-                        num14 = (short)(num14 + (short)overlayPtr.h);
-                        num13 = overlayPtr.dX;
+                        yOffset = yOffset + bgOverlay.h;
+                        xOffset = bgOverlay.scrollX;
                     }
-                    short num15 = (short)(num + (short)bgsprite_LOC_DEF2.offX + num13);
-                    localPosition.x = (float)num15;
-                    localPosition.y = (float)(num14 + num5);
+                    float xOffsetAdjusted = (screenX + (short)bgSprite.offX + xOffset);
+                    localPosition.x = (float)xOffsetAdjusted;
+                    localPosition.y = (float)(yOffset + anchorY);
                 }
                 else
                 {
-                    short num13 = 0;
-                    short num15 = (short)(num + (short)bgsprite_LOC_DEF2.offX);
-                    if (num15 + 16 >= (short)overlayPtr.w)
+                    short xOffset = 0;
+                    short xOffsetAdjusted = (short)(screenX + (short)bgSprite.offX);
+                    if (xOffsetAdjusted + 16 >= (short)bgOverlay.w)
                     {
-                        num15 = (short)(num15 - (short)overlayPtr.w);
-                        num13 = (short)(-overlayPtr.dY);
+                        xOffsetAdjusted = (short)(xOffsetAdjusted - (short)bgOverlay.w);
+                        xOffset = (short)(-bgOverlay.scrollY);
                     }
-                    else if (num15 <= -16)
+                    else if (xOffsetAdjusted <= -16)
                     {
-                        num15 = (short)(num15 + (short)overlayPtr.w);
-                        num13 = overlayPtr.dY;
+                        xOffsetAdjusted = (short)(xOffsetAdjusted + (short)bgOverlay.w);
+                        xOffset = (short)(bgOverlay.scrollY);
                     }
-                    short num14 = (short)(num2 + (short)bgsprite_LOC_DEF2.offY + num13);
-                    localPosition.x = (float)(num15 + num4);
-                    localPosition.y = (float)num14;
+                    localPosition.x = (float)(xOffsetAdjusted + anchorX);
+                    localPosition.y = screenY + (float)bgSprite.offY + xOffset;
                 }
                 localPosition.y += 16f;
-                localPosition.x -= (float)(this.scene.scrX + overlayPtr.curX);
-                localPosition.y -= (float)(this.scene.scrY + overlayPtr.curY);
-                bgsprite_LOC_DEF2.transform.localPosition = localPosition;
+                localPosition.x -= (this.scene.scrX + bgOverlay.curX);
+                localPosition.y -= (this.scene.scrY + bgOverlay.curY);
+                bgSprite.transform.localPosition = localPosition;
             }
-            overlayPtr.transform.localPosition = new Vector3((float)overlayPtr.curX * 1f, (float)overlayPtr.curY * 1f, overlayPtr.transform.localPosition.z);
+            bgOverlay.transform.localPosition = new Vector3((float)bgOverlay.curX * 1f, (float)bgOverlay.curY * 1f, bgOverlay.transform.localPosition.z);
         }
         else
         {
-            float num16;
-            float num17;
-            if ((overlayPtr.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Parallax) != 0 && overlayPtr.isSpecialParallax)
-            {
-                num16 = overlayPtr.parallaxCurX;
-                num17 = overlayPtr.parallaxCurY;
-            }
-            else
-            {
-                num16 = (float)overlayPtr.curX;
-                num17 = (float)overlayPtr.curY;
-            }
-            overlayPtr.transform.localPosition = new Vector3(num16 * 1f, num17 * 1f, overlayPtr.transform.localPosition.z);
+            bgOverlay.transform.localPosition = new Vector3(bgOverlay.curX, bgOverlay.curY, bgOverlay.transform.localPosition.z);
         }
-        overlayPtr.scrX = num;
-        overlayPtr.scrY = num2;
+
+        //if (dbug && ovrNdx == 24) Log.Message("after: overlayPtr.curX:" + overlayPtr.curX);
+        bgOverlay.scrX = screenX;
+        bgOverlay.scrY = screenY;
+
+        foreach (int[] entry in FixDepthOfLayer)
+        {
+            if (entry[0] == FF9StateSystem.Common.FF9.fldMapNo && entry[1] == this.camIdx && entry[2] == ovrNdx)
+            {
+                bgOverlay.curZ = (ushort)entry[3];
+                bgOverlay.transform.localPosition = new Vector3(bgOverlay.transform.localPosition.x, bgOverlay.transform.localPosition.y, entry[3]);
+            }
+        }
     }
+
+    public static readonly Int32[][] FixDepthOfLayer =
+    {
+        // [mapNo,camIdx,ovrNdx,Z],
+        [403,0,23,560], // Dali underground wall over box
+        [403,0,27,1523], // Dali underground barrel
+        [951,0,2,1214], // Gargan Roo's railing
+        [1000,0,12,0], // Clayra's Trunk text
+        [1652,1,5,911], // Iifa platform
+        [1656,0,3,998], // Iifa statue glow (was not active on PSX)
+        [2922,0,8,4329], // Crystal world (was not active on PSX)
+        [2922,0,10,3179], // Crystal world (was not active on PSX)
+        [2922,0,11,3179], // Crystal world (was not active on PSX)
+        [2922,0,12,6080], // Crystal world (was not active on PSX)
+    };
 
     public void EBG_scene2DScroll(Int16 destX, Int16 destY, UInt16 frameCount, UInt32 scrollType)
     {
         if (!IsActive)
             return;
 
-        this.startPoint[0] = (Int16)this.curVRP[0];
-        this.startPoint[1] = (Int16)this.curVRP[1];
-        BGCAM_DEF bgcam_DEF = this.scene.cameraList[this.curCamIdx];
+        this.startPoint.x = this.curVRP.x;
+        this.startPoint.y = this.curVRP.y;
+        BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
 
         if (Configuration.Graphics.WidescreenSupport)
         {
-            if (destX > bgcam_DEF.vrpMaxX)
-                destX = bgcam_DEF.vrpMaxX;
-            else if (destX < bgcam_DEF.vrpMinX)
-                destX = bgcam_DEF.vrpMinX;
+            destX = (Int16)Mathf.Clamp(destX, bgCamera.vrpMinX, bgCamera.vrpMaxX);
         }
 
-        this.endPoint[0] = destX;
-        this.endPoint[1] = destY;
+        this.endPoint.x = destX;
+        this.endPoint.y = destY;
         this.frameCount = (Int16)frameCount;
         this.curFrame = 1;
         this.flags &= ~FieldMapFlags.Generic15;
         if (scrollType == (UInt32)FieldMapFlags.RotationScroll)
             IsRotationScroll = true;
         this.flags |= FieldMapFlags.Unknown1;
+        if (dbug) Log.Message("EBG_scene2DScroll | X:" + startPoint.x + " -> " + endPoint.x + " | Y:" + startPoint.y + " -> " + endPoint.y + " |  frameCount:" + frameCount + " scrollType:" + scrollType);
     }
 
     public void EBG_scene2DScrollRelease(Int32 frameCount, UInt32 scrollType)
@@ -1642,9 +1504,9 @@ public class FieldMap : HonoBehavior
         if (!IsActive)
             return;
 
-        BGCAM_DEF bgcam_DEF = this.scene.cameraList[this.curCamIdx];
-        this.startPoint[0] = (Int16)this.curVRP[0];
-        this.startPoint[1] = (Int16)this.curVRP[1];
+        BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
+        this.startPoint.x = (float)this.curVRP.x;
+        this.startPoint.y = (float)this.curVRP.y;
         Vector3 vertex = Vector3.zero;
         if (FF9StateSystem.Common.FF9.fldMapNo == 1656 && this.playerController == null)
         {
@@ -1660,31 +1522,21 @@ public class FieldMap : HonoBehavior
                 this.playerController = ((Actor)PersistenSingleton<EventEngine>.Instance.GetObjUID(2)).fieldMapActorController;
             }
             vertex = this.playerController.curPos;
-            vertex.y += (Single)this.charAimHeight;
-            vertex = PSX.CalculateGTE_RTPT(vertex, Matrix4x4.identity, bgcam_DEF.GetMatrixRT(), bgcam_DEF.GetViewDistance(), this.offset);
+            vertex.y += (float)this.charAimHeight;
+            vertex = PSX.CalculateGTE_RTPT(vertex, Matrix4x4.identity, bgCamera.GetMatrixRT(), bgCamera.GetViewDistance(), this.offset);
         }
         else
         {
             vertex.x += this.offset.x;
             vertex.y += this.offset.y;
         }
-        Single num = (Int32)vertex.x;
-        Single num2 = (Int32)vertex.y;
-        Single num3 = (bgcam_DEF.w >> 1) + bgcam_DEF.centerOffset[0] + (num - HalfFieldWidth);
-        Single num4 = (bgcam_DEF.h >> 1) + bgcam_DEF.centerOffset[1] + (num2 - HalfFieldHeight);
-        num3 -= this.offset.x - HalfFieldWidth;
-        num4 += this.offset.y - HalfFieldHeight;
-        num4 *= -1f;
-        if (num3 < bgcam_DEF.vrpMinX)
-            num3 = bgcam_DEF.vrpMinX;
-        else if (num3 > bgcam_DEF.vrpMaxX)
-            num3 = bgcam_DEF.vrpMaxX;
-        if (num4 < bgcam_DEF.vrpMinY)
-            num4 = bgcam_DEF.vrpMinY;
-        else if (num4 > bgcam_DEF.vrpMaxY)
-            num4 = bgcam_DEF.vrpMaxY;
-        this.endPoint[0] = (Int16)num3;
-        this.endPoint[1] = (Int16)num4;
+        float targetX = (bgCamera.w / 2) + bgCamera.centerOffset[0] + vertex.x - this.offset.x;
+        float targetY = -( (bgCamera.h / 2) + bgCamera.centerOffset[1] + vertex.y + this.offset.y - (2 * HalfFieldHeight) );
+        targetX = Mathf.Clamp(targetX, bgCamera.vrpMinX, bgCamera.vrpMaxX);
+        targetY = Mathf.Clamp(targetY, bgCamera.vrpMinY, bgCamera.vrpMaxY);
+        this.endPoint.x = targetX;
+        this.endPoint.y = targetY;
+
         if (frameCount == -1)
             this.frameCount = 30;
         else
@@ -1696,9 +1548,11 @@ public class FieldMap : HonoBehavior
 
         if (scrollType != UInt32.MaxValue)
             IsRotationScroll = scrollType == (UInt64)FieldMapFlags.RotationScroll;
+
+        if (dbug) Log.Message("EBG_scene2DScrollRelease | targetX:" + targetX + " targetY:" + targetY);
     }
 
-    public Int32 EBG_animationService()
+    public Int32 BgAnimationService()
     {
         for (Int32 i = 0; i < this.scene.animList.Count; i++)
         {
@@ -1759,19 +1613,20 @@ public class FieldMap : HonoBehavior
                 }
             }
         }
+        //if (dbug) Log.Message("BgAnimationService");
         return 1;
     }
 
-    private Int32 EBG_attachService()
+    private Int32 BgAttachService()
     {
         if (this.attachCount == 0)
             return 0;
-        BGCAM_DEF bgcam_DEF = this.scene.cameraList[this.camIdx];
-        BGSCENE_DEF bgscene_DEF = this.scene;
+        BGCAM_DEF bgCamera = this.scene.cameraList[this.camIdx];
+        BGSCENE_DEF bgScene = this.scene;
         List<BGOVERLAY_DEF> overlayList = this.scene.overlayList;
         Vector3 vertex = this.playerController.curPos;
         vertex.y += (Single)this.charAimHeight;
-        vertex = PSX.CalculateGTE_RTPT(vertex, Matrix4x4.identity, bgcam_DEF.GetMatrixRT(), bgcam_DEF.GetViewDistance(), this.offset);
+        vertex = PSX.CalculateGTE_RTPT(vertex, Matrix4x4.identity, bgCamera.GetMatrixRT(), bgCamera.GetViewDistance(), this.offset);
         vertex.y *= -1f;
         for (Byte i = 0; i < this.attachCount; i++)
         {
@@ -1781,126 +1636,149 @@ public class FieldMap : HonoBehavior
             {
                 Int16 x = ebg_ATTACH_DEF.x;
                 Int16 y = ebg_ATTACH_DEF.y;
-                Int16 overlayX = overlayList[index].curX = (Int16)(vertex.x - bgscene_DEF.curX - x + bgcam_DEF.vrpMinX);
-                Int16 overlayY = overlayList[index].curY = (Int16)(vertex.y - bgscene_DEF.curY - y + bgcam_DEF.vrpMinY);
-                overlayList[index].transform.localPosition = new Vector3(overlayX, overlayY, 0f);
+                float overlayX = overlayList[index].curX = (Int16)(vertex.x - bgScene.curX - x + bgCamera.vrpMinX);
+                float overlayY = overlayList[index].curY = (Int16)(vertex.y - bgScene.curY - y + bgCamera.vrpMinY);
+                overlayList[index].transform.localPosition = new Vector3((short)overlayX, (short)overlayY, 0f);
             }
         }
+        if (dbug) Log.Message("BgAttachService | vertex.x:" + vertex.x + " vertex.y:" + vertex.y);
         return 1;
     }
 
-    public Int32 EBG_sceneServiceScroll(BGSCENE_DEF scenePtr)
+    public Int32 SceneServiceScroll(BGSCENE_DEF bgScene)
     {
-        Int32 overlayCount = (Int32)scenePtr.overlayCount;
-        List<BGOVERLAY_DEF> overlayList = scenePtr.overlayList;
+        Int16 map = FF9StateSystem.Common.FF9.fldMapNo;
+        Int32 overlayCount = (Int32)bgScene.overlayCount;
+        List<BGOVERLAY_DEF> overlayList = bgScene.overlayList;
         for (Int32 i = 0; i < overlayCount; i++)
         {
-            BGOVERLAY_DEF bgoverlay_DEF = overlayList[i];
-            if ((bgoverlay_DEF.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Loop) != 0)
+            BGOVERLAY_DEF bgOverlay = overlayList[i];
+            if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Loop) != 0)
             {
-                if (bgoverlay_DEF.dX != 0 && bgoverlay_DEF.dX != 32767)
+                if (bgOverlay.scrollX != 0 && bgOverlay.scrollX != 32767)
                 {
-                    Int32 num = (Int32)(bgoverlay_DEF.curX - bgoverlay_DEF.orgX) << 8 | (Int32)(bgoverlay_DEF.fracX & 255);
-                    num += (Int32)bgoverlay_DEF.dX;
-                    bgoverlay_DEF.curX = (Int16)((num >> 8) % (Int32)bgoverlay_DEF.w + (Int32)bgoverlay_DEF.orgX);
-                    bgoverlay_DEF.fracX = (Int16)(num & 255);
+                    bgOverlay.curX = (bgOverlay.curX % (Int32)bgOverlay.w) + (bgOverlay.scrollX / 256f);
                 }
-                if (bgoverlay_DEF.dY != 0 && bgoverlay_DEF.dY != 32767)
+                if (bgOverlay.scrollY != 0 && bgOverlay.scrollY != 32767)
                 {
-                    Int32 num = (Int32)(bgoverlay_DEF.curY - bgoverlay_DEF.orgY) << 8 | (Int32)(bgoverlay_DEF.fracY & 255);
-                    num += (Int32)bgoverlay_DEF.dY;
-                    bgoverlay_DEF.curY = (Int16)((num >> 8) % (Int32)bgoverlay_DEF.h + (Int32)bgoverlay_DEF.orgY);
-                    bgoverlay_DEF.fracY = (Int16)(num & 255);
+                    bgOverlay.curY = (bgOverlay.curY % (Int32)bgOverlay.h) + (bgOverlay.scrollY / 256f);
+                }
+                if (dbug) Log.Message("SceneServiceScroll " + i + " | Loop | curX:" + bgOverlay.curX + " / curY:" + bgOverlay.curY);
+
+                if (Configuration.Graphics.InitializeWidescreenSupport())
+                {
+                    switch (map)
+                    {
+                        case 1651: // Iifa roots 1
+                            bgOverlay.curX = 200; break;
+                        case 1758: // Iifa roots 2
+                            bgOverlay.curX = 200; bgOverlay.curY = 0; break;
+                    }
+                    
                 }
             }
-            if ((bgoverlay_DEF.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset) != 0)
+            if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset) != 0) // loop in diagonal (816) or loop + parallax (2904)
             {
-                if (bgoverlay_DEF.isXOffset != 0)
+                if (bgOverlay.isXOffset != 0)
                 {
-                    if (bgoverlay_DEF.dY != 32767)
+                    if (bgOverlay.scrollY != 32767)
                     {
-                        Int32 num = (Int32)bgoverlay_DEF.curY << 8 | (Int32)(bgoverlay_DEF.fracY & 255);
-                        num += (Int32)bgoverlay_DEF.dY;
-                        bgoverlay_DEF.curY = (Int16)((num >> 8) % (Int32)bgoverlay_DEF.h);
-                        bgoverlay_DEF.fracY = (Int16)(num & 255);
+                        bgOverlay.curY = bgOverlay.curY % (Int32)bgOverlay.h + (bgOverlay.scrollY / 256f);
                     }
                 }
-                else if (bgoverlay_DEF.dX != 32767)
+                else if (bgOverlay.scrollX != 32767)
                 {
-                    Int32 num = (Int32)bgoverlay_DEF.curX << 8 | (Int32)(bgoverlay_DEF.fracX & 255);
-                    num += (Int32)bgoverlay_DEF.dX;
-                    bgoverlay_DEF.curX = (Int16)((num >> 8) % (Int32)bgoverlay_DEF.w);
-                    bgoverlay_DEF.fracX = (Int16)(num & 255);
+                    bgOverlay.curX = bgOverlay.curX % (Int32)bgOverlay.w + (bgOverlay.scrollX / 256f);
                 }
+                if (dbug) Log.Message("SceneServiceScroll " + i + " | ScrollWithOffset | X:" + bgOverlay.curX + " Y:" + bgOverlay.curY);
             }
-            if ((bgoverlay_DEF.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Parallax) != 0)
+            if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Parallax) != 0)
             {
-                Int32 num = (Int32)((Single)(bgoverlay_DEF.orgX << 8) + (this.curVRP[0] - this.parallaxOrg[0]) * (Single)bgoverlay_DEF.dX);
-                bgoverlay_DEF.curX = (Int16)(num >> 8);
-                bgoverlay_DEF.fracX = (Int16)(num & 255);
-                num = (Int32)((Single)(bgoverlay_DEF.orgY << 8) + (this.curVRP[1] - this.parallaxOrg[1]) * (Single)bgoverlay_DEF.dY);
-                bgoverlay_DEF.curY = (Int16)(num >> 8);
-                bgoverlay_DEF.fracY = (Int16)(num & 255);
-                if (FF9StateSystem.Common.FF9.fldMapNo == 1251 || FF9StateSystem.Common.FF9.fldMapNo == 150 || FF9StateSystem.Common.FF9.fldMapNo == 805 || FF9StateSystem.Common.FF9.fldMapNo == 808 || FF9StateSystem.Common.FF9.fldMapNo == 2953 || FF9StateSystem.Common.FF9.fldMapNo == 2952 || FF9StateSystem.Common.FF9.fldMapNo == 1009 || FF9StateSystem.Common.FF9.fldMapNo == 1108 || FF9StateSystem.Common.FF9.fldMapNo == 1758 || FF9StateSystem.Common.FF9.fldMapNo == 1651 || FF9StateSystem.Common.FF9.fldMapNo == 2851 || FF9StateSystem.Common.FF9.fldMapNo == 3100 || FF9StateSystem.Common.FF9.fldMapNo == 2720 || FF9StateSystem.Common.FF9.fldMapNo == 1908 || FF9StateSystem.Common.FF9.fldMapNo == 908)
+                bgOverlay.curX = bgOverlay.orgX + ((this.curVRP.x + SmoothCamDelta.x - this.parallaxOrg.x) * (bgOverlay.scrollX / 256f));
+                bgOverlay.curY = bgOverlay.orgY + ((this.curVRP.y - SmoothCamDelta.y - this.parallaxOrg.y) * (bgOverlay.scrollY / 256f));
+
+                if (dbug) Log.Message("SceneServiceScroll " + i + " | Parallax | X:" + bgOverlay.curX + " Y:" + bgOverlay.curY + " SmoothCamDelta.x " + SmoothCamDelta.x);
+
+                if (Configuration.Graphics.InitializeWidescreenSupport())
                 {
-                    bgoverlay_DEF.isSpecialParallax = true;
-                    Single num2 = (Single)(bgoverlay_DEF.orgX * 256) + (this.curVRP[0] - this.parallaxOrg[0]) * (Single)bgoverlay_DEF.dX;
-                    bgoverlay_DEF.parallaxCurX = num2 / 256f;
-                    bgoverlay_DEF.fracX = (Int16)((Int32)num2 & 255);
-                    num2 = (Single)(bgoverlay_DEF.orgY * 256) + (this.curVRP[1] - this.parallaxOrg[1]) * (Single)bgoverlay_DEF.dY;
-                    bgoverlay_DEF.parallaxCurY = num2 / 256f;
-                    bgoverlay_DEF.fracY = (Int16)((Int32)num2 & 255);
+                    switch (map)
+                    {
+                        case 1651: // Iifa roots 1
+                            bgOverlay.transform.localScale = new Vector3(1.1f, 1.1f, 1f); bgOverlay.curX = -8; break;
+                        case 1657:
+                            bgOverlay.curX = this.mainCamera.transform.localPosition.x * (bgOverlay.scrollX / 256f) - (float)0.25; break;
+                        case 1758: // Iifa roots 2
+                            bgOverlay.transform.localScale = new Vector3(1.1f, 1.1f, 1f); bgOverlay.curX = -8; break;
+                        case 2600: // 464/416
+                            bgOverlay.transform.localScale = new Vector3(1.12f, 1.12f, 1f); bgOverlay.curX -= 24; break;
+                        case 2602: // 384/328
+                            bgOverlay.transform.localScale = new Vector3(1.05f, 1.05f, 1f); bgOverlay.curX = 28; break;
+                        case 2605: // 400/368
+                            bgOverlay.transform.localScale = new Vector3(1.1f, 1.1f, 1f); bgOverlay.curX -= 16; break;
+                        case 2606:
+                            bgOverlay.curX = this.mainCamera.transform.localPosition.x * (bgOverlay.scrollX / 256f); break;
+                        case 2607: // 416/400
+                            bgOverlay.transform.localScale = new Vector3(1.05f, 1.05f, 1f); bgOverlay.curX -= 8; bgOverlay.curY -= 8; break;
+                        case 2651:
+                            bgOverlay.transform.localScale = new Vector3(1.2f, 1.2f, 1f); bgOverlay.curX -= 56; bgOverlay.curY -= 16; break;
+                        case 2660: // 536/528
+                            bgOverlay.transform.localScale = new Vector3(1.02f, 1.02f, 1f); bgOverlay.curX -= 8; break;
+                    }
                 }
             }
         }
         if ((this.flags & FieldMapFlags.Unknown128) != 0u)
         {
-            this.orgVRP[0] = this.curVRP[0];
-            this.orgVRP[1] = this.curVRP[1];
+            this.orgVRP.x = this.curVRP.x;
+            this.orgVRP.y = this.curVRP.y;
             this.flags &= FieldMapFlags.Generic127;
         }
         return 1;
     }
 
-    public void EBG_sceneService2DScroll()
+    public void SceneService2DScroll()
     {
         if (!IsActive)
             return;
 
-        FieldMapFlags fl = this.flags & FieldMapFlags.Generic7;
-        if (fl == 0 || fl >= FieldMapFlags.Unknown4)
+        FieldMapFlags flags = this.flags & FieldMapFlags.Generic7;
+        if (flags == 0 || flags >= FieldMapFlags.Unknown4)
             return;
 
         Int16 currentFrame = this.curFrame;
         Int16 totalFrames = this.frameCount;
-        BGCAM_DEF currentCamera = this.scene.cameraList[this.curCamIdx];
-        Int16 aimX = (Int16)(this.endPoint.x - currentCamera.centerOffset[0] - HalfFieldWidth - this.startPoint.x);
-        Int16 aimY = (Int16)(this.endPoint.y + currentCamera.centerOffset[1] - HalfFieldHeight - this.startPoint.y);
-        Single viewportX = this.curVRP.x;
-        Single viewportY = this.curVRP.y;
+        BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
+        float aimX = (float)(this.endPoint.x - bgCamera.centerOffset[0] - HalfFieldWidth - this.startPoint.x);
+        float aimY = (float)(this.endPoint.y + bgCamera.centerOffset[1] - HalfFieldHeight - this.startPoint.y);
+        float viewportX = this.curVRP.x;
+        float viewportY = this.curVRP.y;
+
         if (IsRotationScroll)
         {
-            Int32 fixedPointAngle = 2048 * currentFrame / totalFrames + 2048;
+            Int32 fixedPointAngle = (2048 * currentFrame / totalFrames) + 2048;
             Int32 rcos = ff9.rcos(fixedPointAngle) + 4096;
-            Int32 rotX = aimX * rcos / 8192;
-            Int32 rotY = aimY * rcos / 8192;
-            this.curVRP[0] = this.startPoint[0] + rotX;
-            this.curVRP[1] = this.startPoint[1] + rotY;
+            float rotX = aimX * rcos / 8192;
+            float rotY = aimY * rcos / 8192;
+            this.curVRP.x = (float)(this.startPoint.x + rotX);
+            this.curVRP.y = (float)(this.startPoint.y + rotY);
+            //if (dbug) Log.Message("SceneService2DScroll(IsRotationScroll) | this.curVRP.x:" + this.curVRP.x + " this.curVRP.y:" + this.curVRP.y);
         }
         else
         {
-            this.curVRP[0] = this.startPoint[0] + aimX * currentFrame / (Single)totalFrames;
-            this.curVRP[1] = this.startPoint[1] + aimY * currentFrame / (Single)totalFrames;
+            this.curVRP.x = this.startPoint.x + aimX * currentFrame / totalFrames;
+            this.curVRP.y = this.startPoint.y + aimY * currentFrame / totalFrames;
+            //if (dbug) Log.Message("SceneService2DScroll | this.curVRP.x:" + this.curVRP.x + " this.curVRP.y:" + this.curVRP.y);
         }
 
-        viewportX = this.curVRP[0] - viewportX;
-        viewportY = this.curVRP[1] - viewportY;
+        viewportX = this.curVRP.x - viewportX;
+        viewportY = this.curVRP.y - viewportY;
+        //if (dbug) Log.Message("SceneService2DScroll | viewportX:" + viewportX + " viewportY:" + viewportY);
 
-        UpdateOverlayXY((Int16)viewportX, (Int16)viewportY);
+        UpdateOverlayXY(viewportX, viewportY);
 
-        this.charOffset = new Vector2(this.curVRP[0], this.curVRP[1]);
+        this.charOffset = new Vector2(this.curVRP.x, this.curVRP.y);
 
-        if (fl == FieldMapFlags.Unknown1)
+        if (flags == FieldMapFlags.Unknown1)
         {
             this.flags &= ~FieldMapFlags.Unknown1;
             this.flags |= FieldMapFlags.Unknown2;
@@ -1921,50 +1799,96 @@ public class FieldMap : HonoBehavior
         }
     }
 
-    private void UpdateOverlayXY(Int16 dx, Int16 dy)
+    private void UpdateOverlayXY(float dx, float dy)
     {
-        for (Int32 overlayIndex = 0; overlayIndex < this.scene.overlayCount; overlayIndex++)
+        for (Int32 overlayNdx = 0; overlayNdx < this.scene.overlayCount; overlayNdx++)
         {
-            BGOVERLAY_DEF overlay = this.scene.overlayList[overlayIndex];
-            if ((overlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Loop) != 0)
-            {
-                if (overlay.dX != 0)
-                    overlay.curX = (Int16)(overlay.curX + dx);
-                if (overlay.dY != 0)
-                    overlay.curY = (Int16)(overlay.curY + dy);
+            BGOVERLAY_DEF bgOverlay = this.scene.overlayList[overlayNdx];
 
-                this.EBG_alphaScaleX(overlay, dx);
-                this.EBG_alphaScaleY(overlay, dy);
+            if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.Loop) != 0)
+            {
+                if (bgOverlay.scrollX != 0)
+                    bgOverlay.curX += dx;
+                if (bgOverlay.scrollY != 0)
+                    bgOverlay.curY += dy;
+                if (dbug) Log.Message("UpdateOverlayXY " + overlayNdx + " | Loop | dx:" + dx + " scrollX:" + bgOverlay.scrollX + " curX:" + bgOverlay.curX + " scrollY:" + bgOverlay.scrollY + " curY:" + bgOverlay.curY);
+                this.alphaScaleX(bgOverlay, dx);
+                this.alphaScaleY(bgOverlay, dy);
             }
-            else if ((overlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset) != 0)
+            else if ((bgOverlay.flags & BGOVERLAY_DEF.OVERLAY_FLAG.ScrollWithOffset) != 0)
             {
-                if (overlay.isXOffset != 0)
-                    overlay.curY = (Int16)(overlay.curY + dy);
+                if (bgOverlay.isXOffset != 0)
+                    bgOverlay.curY += dy;
                 else
-                    overlay.curX = (Int16)(overlay.curX + dx);
-
-                this.EBG_alphaScaleX(overlay, dx);
-                this.EBG_alphaScaleY(overlay, dy);
+                    bgOverlay.curX += dx;
+                if (dbug) Log.Message("UpdateOverlayXY " + overlayNdx + " | dx:" + dx + " ScrollWithOffset | curX:" + bgOverlay.curX + " curY:" + bgOverlay.curY);
+                this.alphaScaleX(bgOverlay, dx);
+                this.alphaScaleY(bgOverlay, dy);
             }
         }
     }
 
-    private void EBG_sceneService3DScroll()
+    public float alphaScaleX(BGOVERLAY_DEF bgOverlay, float dx)
     {
-        if (!IsScene3dScrollAllowed())
+        float scaledValue = dx * 65536;
+        float ScaleFactor = (float)this.scrollWindowAlphaX[(Int32)bgOverlay.viewportNdx] * 256;
+        if (ScaleFactor == 65536)
+        {
+            return bgOverlay.curX;
+        }
+        scaledValue = (bgOverlay.curX * 65536) - scaledValue * Math3D.Fixed2Float((int)Math.Abs(ScaleFactor));
+        bgOverlay.curX = scaledValue / 65536;
+        if (dbug) Log.Message("EBG_alphaScaleX | scaledValue:" + scaledValue + " ScaleFactor:" + ScaleFactor + " curX:" + bgOverlay.curX); 
+        return bgOverlay.curX;
+    }
+
+    public float alphaScaleY(BGOVERLAY_DEF bgOverlay, float dy)
+    {
+        float scaledValue = dy * 65536;
+        float ScaleFactor = (float)this.scrollWindowAlphaY[(Int32)bgOverlay.viewportNdx] * 256;
+        if (ScaleFactor == 65536)
+        {
+            return bgOverlay.curY;
+        }
+        scaledValue = (bgOverlay.curY * 65536) - Math3D.Float2Fixed(Math3D.Fixed2Float((int)scaledValue) * Math3D.Fixed2Float((int)Math.Abs(ScaleFactor)));
+        bgOverlay.curY = scaledValue / 65536;
+        if (dbug) Log.Message("EBG_alphaScaleY | scaledValue:" + scaledValue + " ScaleFactor:" + ScaleFactor + " curY:" + bgOverlay.curY);
+        return bgOverlay.curY;
+    }
+
+    private void SceneService3DScroll()
+    {
+        Int16 map = FF9StateSystem.Common.FF9.fldMapNo;
+
+        if ((this.flags & FieldMapFlags.Generic7) != 0u || !this.IsActive || map == 70 || this.curCamIdx < 0 || this.curCamIdx > this.scene.cameraList.Count)
             return;
 
-        CrutchForIpsenMap(); // EVT_IPSEN_IP_CNT_2
-        CrutchForEvaMap(); // EVT_EVA1_IF_PTS_1
+        if (map == 2512 && this.playerController == null) // CrutchForIpsenMap EVT_IPSEN_IP_CNT_2
+        {
+            this.playerController = ((Actor)PersistenSingleton<EventEngine>.Instance.GetObjUID(2)).fieldMapActorController;
+            if (dbug) Log.Message("SceneService3DScroll | CrutchForIpsenMap");
+        }
+
+        if (map == 1656) // CrutchForEvaMap EVT_EVA1_IF_PTS_1
+        {
+            Int32 isNeedOffset = PersistenSingleton<EventEngine>.Instance.eBin.getVarManually(7385);
+            if (isNeedOffset == 1)
+            {
+                this.playerController = null;
+                this.extraOffset.x = -16f;
+                this.extraOffset.y = -8f;
+                if (dbug) Log.Message("SceneService3DScroll | CrutchForEvaMap | isNeedOffset");
+            }
+        }
 
         Vector3 prevScrOffset = Vector3.zero;
-        BGCAM_DEF currentCamera = this.scene.cameraList[this.curCamIdx];
+        BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
 
         if (this.playerController != null)
         {
             prevScrOffset = this.playerController.curPos;
             prevScrOffset.y += this.charAimHeight;
-            prevScrOffset = PSX.CalculateGTE_RTPT(prevScrOffset, Matrix4x4.identity, currentCamera.GetMatrixRT(), currentCamera.GetViewDistance(), this.offset);
+            prevScrOffset = PSX.CalculateGTE_RTPT(prevScrOffset, Matrix4x4.identity, bgCamera.GetMatrixRT(), bgCamera.GetViewDistance(), this.offset);
         }
         else
         {
@@ -1973,165 +1897,37 @@ public class FieldMap : HonoBehavior
         }
 
         this.prevScr = prevScrOffset;
-        Single aimX = (currentCamera.w >> 1) + currentCamera.centerOffset[0] + prevScrOffset.x - HalfFieldWidth;
-        Single aimY = (currentCamera.h >> 1) + currentCamera.centerOffset[1] + prevScrOffset.y - HalfFieldHeight;
-        Single prevScrX = prevScrOffset.x;
-        Single prevScrY = prevScrOffset.y;
+        float aimX = (bgCamera.w >> 1) + bgCamera.centerOffset[0] + prevScrOffset.x - HalfFieldWidth;
+        float aimY = (bgCamera.h >> 1) + bgCamera.centerOffset[1] + prevScrOffset.y - HalfFieldHeight;
+        float prevScrX = prevScrOffset.x;
+        float prevScrY = prevScrOffset.y;
         aimX -= this.offset.x - HalfFieldWidth;
         aimY += this.offset.y - HalfFieldHeight;
         aimY *= -1f;
 
-        if (aimX < currentCamera.vrpMinX)
-            prevScrX = this.offset.x - (currentCamera.w >> 1) - currentCamera.centerOffset[0] + currentCamera.vrpMinX;
-        else if (aimX > currentCamera.vrpMaxX)
-            prevScrX = this.offset.x - (currentCamera.w >> 1) - currentCamera.centerOffset[0] + currentCamera.vrpMaxX;
+        if (aimX < bgCamera.vrpMinX)
+            prevScrX = this.offset.x - (bgCamera.w >> 1) - bgCamera.centerOffset[0] + bgCamera.vrpMinX;
+        else if (aimX > bgCamera.vrpMaxX)
+            prevScrX = this.offset.x - (bgCamera.w >> 1) - bgCamera.centerOffset[0] + bgCamera.vrpMaxX;
 
-        if (aimY < currentCamera.vrpMinY)
-            prevScrY = this.offset.y + (currentCamera.h >> 1) + currentCamera.centerOffset[1] - currentCamera.vrpMinY;
-        else if (aimY > currentCamera.vrpMaxY)
-            prevScrY = this.offset.y + (currentCamera.h >> 1) + currentCamera.centerOffset[1] - currentCamera.vrpMaxY;
+        if (aimY < bgCamera.vrpMinY)
+            prevScrY = this.offset.y + (bgCamera.h >> 1) + bgCamera.centerOffset[1] - bgCamera.vrpMinY;
+        else if (aimY > bgCamera.vrpMaxY)
+            prevScrY = this.offset.y + (bgCamera.h >> 1) + bgCamera.centerOffset[1] - bgCamera.vrpMaxY;
 
-        this.charOffset.x = prevScrX - currentCamera.centerOffset[0];
-        this.charOffset.y = -(prevScrY - currentCamera.centerOffset[1]);
+        this.charOffset.x = prevScrX - bgCamera.centerOffset[0];
+        this.charOffset.y = -(prevScrY - bgCamera.centerOffset[1]);
 
-        Int16 dx, dy;
-        this.EBG_lookAtPoint(currentCamera, aimX, aimY, out dx, out dy);
+
+        float prevVRPx = this.curVRP.x;
+        float prevVRPy = this.curVRP.y;
+        this.curVRP.x = Mathf.Clamp(aimX, bgCamera.vrpMinX, bgCamera.vrpMaxX) - bgCamera.centerOffset[0] - HalfFieldWidth;
+        this.curVRP.y = Mathf.Clamp(aimY, bgCamera.vrpMinY, bgCamera.vrpMaxY) + bgCamera.centerOffset[1] - HalfFieldHeight;
+        float dx = this.curVRP.x - prevVRPx;
+        float dy = this.curVRP.y - prevVRPy;
+        if (dbug) Log.Message("SceneService3DScroll | dx:" + dx + " dy:" + dy + " curVRP.x:" + this.curVRP.x + " curVRP.y:" + this.curVRP.y);
 
         UpdateOverlayXY(dx, dy);
-    }
-
-    private void CrutchForEvaMap()
-    {
-        const Int32 evaMapIndex = 1656; //EVT_EVA1_IF_PTS_1
-
-        if (FF9StateSystem.Common.FF9.fldMapNo != evaMapIndex)
-            return;
-
-        Int32 isNeedOffset = PersistenSingleton<EventEngine>.Instance.eBin.getVarManually(7385);
-        if (isNeedOffset == 1)
-        {
-            this.playerController = null;
-            this.extraOffset.x = -16f;
-            this.extraOffset.y = -8f;
-        }
-    }
-
-    private void CrutchForIpsenMap()
-    {
-        const Int32 ipsenMapIndex = 2512; // EVT_IPSEN_IP_CNT_2
-
-        if (FF9StateSystem.Common.FF9.fldMapNo == ipsenMapIndex && this.playerController == null)
-        {
-            this.playerController = ((Actor)PersistenSingleton<EventEngine>.Instance.GetObjUID(2)).fieldMapActorController;
-        }
-    }
-
-    private Boolean IsScene3dScrollAllowed()
-    {
-        if ((this.flags & FieldMapFlags.Generic7) != 0u)
-            return false;
-        if (!IsActive)
-            return false;
-        if (FF9StateSystem.Common.FF9.fldMapNo == 70) // Opening-For FMV
-            return false;
-        if (this.curCamIdx < 0 || this.curCamIdx > this.scene.cameraList.Count)
-            return false;
-
-        return true;
-    }
-
-    public static Int32 f1616_mul(Int32 a, Int32 b)
-    {
-        return Math3D.Float2Fixed(Math3D.Fixed2Float(a) * Math3D.Fixed2Float(b));
-    }
-
-    public Int16 EBG_alphaScaleX(BGOVERLAY_DEF oPtr, Int16 val)
-    {
-        Int32 num = (Int32)val << 16;
-        Int32 num2 = (Int32)this.scrollWindowAlphaX[(Int32)oPtr.viewportNdx] << 8;
-        if (num2 == 65536)
-        {
-            return oPtr.curX;
-        }
-        if (num2 < 0)
-        {
-            num2 = -num2;
-            num = ((Int32)oPtr.curX << 16) - FieldMap.f1616_mul(num, num2);
-            oPtr.curX = (Int16)(num >> 16);
-            oPtr.fracX = (Int16)(num >> 8 & 255);
-        }
-        else
-        {
-            num = ((Int32)oPtr.curX << 16) + FieldMap.f1616_mul(num, num2);
-            oPtr.curX = (Int16)(num >> 16);
-            oPtr.fracX = (Int16)(num >> 8 & 255);
-        }
-        return oPtr.curX;
-    }
-
-    public Int16 EBG_alphaScaleY(BGOVERLAY_DEF oPtr, Int16 val)
-    {
-        Int32 num = (Int32)val << 16;
-        Int32 num2 = (Int32)this.scrollWindowAlphaY[(Int32)oPtr.viewportNdx] << 8;
-        if (num2 == 65536)
-        {
-            return oPtr.curY;
-        }
-        if (num2 < 0)
-        {
-            num2 = -num2;
-            num = ((Int32)oPtr.curY << 16) - FieldMap.f1616_mul(num, num2);
-            oPtr.curY = (Int16)(num >> 16);
-            oPtr.fracY = (Int16)(num >> 8 & 255);
-        }
-        else
-        {
-            num = ((Int32)oPtr.curY << 16) + FieldMap.f1616_mul(num, num2);
-            oPtr.curY = (Int16)(num >> 16);
-            oPtr.fracY = (Int16)(num >> 8 & 255);
-        }
-        return oPtr.curY;
-    }
-
-    public Int32 EBG_lookAtPoint(BGCAM_DEF camPtr, Single aimX, Single aimY, out Int16 dX, out Int16 dY)
-    {
-        if (!IsActive)
-        {
-            dX = 0;
-            dY = 0;
-            return 1;
-        }
-        Single x = this.curVRP.x;
-        Single y = this.curVRP.y;
-        if (aimX < (Single)camPtr.vrpMinX)
-        {
-            this.curVRP[0] = (Single)camPtr.vrpMinX;
-        }
-        else if (aimX > (Single)camPtr.vrpMaxX)
-        {
-            this.curVRP[0] = (Single)camPtr.vrpMaxX;
-        }
-        else
-        {
-            this.curVRP[0] = aimX;
-        }
-        if (aimY < (Single)camPtr.vrpMinY)
-        {
-            this.curVRP[1] = (Single)camPtr.vrpMinY;
-        }
-        else if (aimY > (Single)camPtr.vrpMaxY)
-        {
-            this.curVRP[1] = (Single)camPtr.vrpMaxY;
-        }
-        else
-        {
-            this.curVRP[1] = aimY;
-        }
-        this.curVRP[0] = this.curVRP[0] - (Single)camPtr.centerOffset[0] - HalfFieldWidth;
-        this.curVRP[1] = this.curVRP[1] + (Single)camPtr.centerOffset[1] - HalfFieldHeight;
-        dX = (Int16)(this.curVRP.x - x);
-        dY = (Int16)(this.curVRP.y - y);
-        return 1;
     }
 
     public void EBG_char3DScrollSetActive(UInt32 isActive, Int32 frameCount, UInt32 scrollType)
@@ -2155,19 +1951,20 @@ public class FieldMap : HonoBehavior
         if (!IsLocked)
             return;
 
-        BGSCENE_DEF bgscene_DEF = this.scene;
-        if (bgscene_DEF != null)
+        BGSCENE_DEF bgScene = this.scene;
+        if (bgScene != null)
         {
-            BGCAM_DEF bgcam_DEF = this.scene.cameraList[this.curCamIdx];
-            this.origVRPMinX = bgcam_DEF.vrpMinX;
-            this.origVRPMaxX = bgcam_DEF.vrpMaxX;
-            this.origVRPMinY = bgcam_DEF.vrpMinY;
-            this.origVRPMaxY = bgcam_DEF.vrpMaxY;
-            bgcam_DEF.vrpMinX = (Int16)this.SHRT_MIN;
-            bgcam_DEF.vrpMaxX = (Int16)this.SHRT_MAX;
-            bgcam_DEF.vrpMinY = (Int16)this.SHRT_MIN;
-            bgcam_DEF.vrpMaxY = (Int16)this.SHRT_MAX;
+            BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
+            this.origVRPMinX = bgCamera.vrpMinX;
+            this.origVRPMaxX = bgCamera.vrpMaxX;
+            this.origVRPMinY = bgCamera.vrpMinY;
+            this.origVRPMaxY = bgCamera.vrpMaxY;
+            bgCamera.vrpMinX = (Int16)this.SHRT_MIN;
+            bgCamera.vrpMaxX = (Int16)this.SHRT_MAX;
+            bgCamera.vrpMinY = (Int16)this.SHRT_MIN;
+            bgCamera.vrpMaxY = (Int16)this.SHRT_MAX;
             IsLocked = false;
+            //if (dbug) Log.Message("EBG_charLookAtUnlock bgCamera.vrpMinX " + bgCamera.vrpMinX + " bgCamera.vrpMaxX " + bgCamera.vrpMaxX);
         }
     }
 
@@ -2176,15 +1973,16 @@ public class FieldMap : HonoBehavior
         if (IsLocked)
             return;
 
-        BGSCENE_DEF bgscene_DEF = this.scene;
-        if (bgscene_DEF != null)
+        BGSCENE_DEF bgScene = this.scene;
+        if (bgScene != null)
         {
-            BGCAM_DEF bgcam_DEF = this.scene.cameraList[this.curCamIdx];
-            bgcam_DEF.vrpMinX = this.origVRPMinX;
-            bgcam_DEF.vrpMaxX = this.origVRPMaxX;
-            bgcam_DEF.vrpMinY = this.origVRPMinY;
-            bgcam_DEF.vrpMaxY = this.origVRPMaxY;
+            BGCAM_DEF bgCamera = this.scene.cameraList[this.curCamIdx];
+            bgCamera.vrpMinX = this.origVRPMinX;
+            bgCamera.vrpMaxX = this.origVRPMaxX;
+            bgCamera.vrpMinY = this.origVRPMinY;
+            bgCamera.vrpMaxY = this.origVRPMaxY;
             IsLocked = true;
+            //if (dbug) Log.Message("EBG_charLookAtLock bgCamera.vrpMinX " + bgCamera.vrpMinX + " bgCamera.vrpMaxX " + bgCamera.vrpMaxX);
         }
     }
 
@@ -2276,722 +2074,97 @@ public class FieldMap : HonoBehavior
 
     private static readonly Dictionary<int, FieldMap.EbgCombineMeshData> combineMeshDict = new Dictionary<int, FieldMap.EbgCombineMeshData>
     {
-        {
-            351,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            358,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    13,
-                    14
-                }
-            }
-        },
-        {
-            450,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            407,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            55,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    5
-                }
-            }
-        },
-        {
-            57,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            60,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    15,
-                    16
-                }
-            }
-        },
-        {
-            111,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    10
-                }
-            }
-        },
-        {
-            153,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            154,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            307,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    6,
-                    8
-                }
-            }
-        },
-        {
-            308,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            309,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            507,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    8,
-                    9,
-                    10
-                }
-            }
-        },
-        {
-            551,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    13
-                }
-            }
-        },
-        {
-            556,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    27
-                }
-            }
-        },
-        {
-            566,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            576,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            603,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    35
-                }
-            }
-        },
-        {
-            612,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            662,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            705,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    25
-                }
-            }
-        },
-        {
-            706,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    13
-                }
-            }
-        },
-        {
-            707,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            751,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            755,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            766,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            802,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            810,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    6,
-                    7
-                }
-            }
-        },
-        {
-            815,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            910,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    12,
-                    13,
-                    14,
-                    15,
-                    16,
-                    17,
-                    19
-                }
-            }
-        },
-        {
-            1910,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    12,
-                    13,
-                    14,
-                    15,
-                    16,
-                    17,
-                    19
-                }
-            }
-        },
-        {
-            916,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            951,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            952,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            957,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1056,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    19,
-                    24
-                }
-            }
-        },
-        {
-            1106,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    19,
-                    24
-                }
-            }
-        },
-        {
-            1153,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    6,
-                    7
-                }
-            }
-        },
-        {
-            1206,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    5,
-                    6,
-                    7,
-                    8,
-                    9,
-                    10,
-                    11
-                }
-            }
-        },
-        {
-            1207,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    7,
-                    8
-                }
-            }
-        },
-        {
-            1214,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1215,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1222,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    21,
-                    22,
-                    23,
-                    24,
-                    25
-                }
-            }
-        },
-        {
-            1223,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    5,
-                    6,
-                    7,
-                    8,
-                    9,
-                    10,
-                    11
-                }
-            }
-        },
-        {
-            1301,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    13
-                }
-            }
-        },
-        {
-            1307,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1312,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1355,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1362,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1455,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            3054,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1505,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    0,
-                    8,
-                    13
-                }
-            }
-        },
-        {
-            1950,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1225,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    5,
-                    6,
-                    7,
-                    8,
-                    9,
-                    10,
-                    11
-                }
-            }
-        },
-        {
-            1801,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    5,
-                    6,
-                    7,
-                    8,
-                    9,
-                    10,
-                    11
-                }
-            }
-        },
-        {
-            1802,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    7,
-                    8
-                }
-            }
-        },
-        {
-            3002,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    7,
-                    8
-                }
-            }
-        },
-        {
-            1806,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1807,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1814,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    21,
-                    22,
-                    23,
-                    24,
-                    25
-                }
-            }
-        },
-        {
-            1816,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    15,
-                    16,
-                    17,
-                    18,
-                    19
-                }
-            }
-        },
-        {
-            1823,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1852,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            1860,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    10
-                }
-            }
-        },
-        {
-            1865,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    17,
-                    18,
-                    20
-                }
-            }
-        },
-        {
-            2000,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2001,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    7,
-                    8
-                }
-            }
-        },
-        {
-            2101,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    13
-                }
-            }
-        },
-        {
-            565,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2112,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            605,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2155,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2162,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2200,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    12,
-                    13,
-                    14,
-                    15,
-                    16,
-                    17,
-                    18,
-                    19,
-                    21,
-                    22,
-                    23,
-                    24,
-                    25
-                }
-            }
-        },
-        {
-            2217,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2220,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    4,
-                    5,
-                    6,
-                    7
-                }
-            }
-        },
-        {
-            2221,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    2,
-                    4,
-                    5,
-                    26,
-                    29
-                }
-            }
-        },
-        {
-            2404,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2453,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    1
-                }
-            }
-        },
-        {
-            2853,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    4,
-                    5,
-                    6,
-                    7,
-                    8,
-                    9,
-                    10,
-                    11,
-                    12,
-                    13,
-                    14,
-                    15
-                }
-            }
-        },
-        {
-            2502,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2506,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            2509,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    2,
-                    3
-                }
-            }
-        },
-        {
-            2652,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    4
-                }
-            }
-        },
-        {
-            2906,
-            (FieldMap.EbgCombineMeshData)null
-        },
-        {
-            3100,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    38,
-                    40,
-                    46,
-                    47,
-                    48,
-                    49,
-                    50,
-                    52
-                }
-            }
-        },
-        {
-            2107,
-            new FieldMap.EbgCombineMeshData
-            {
-                skipOverlayList = new List<int>
-                {
-                    0,
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    12
-                }
-            }
-        }
+        {351, (FieldMap.EbgCombineMeshData)null},
+        {358, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 13, 14 }}},
+        {450, (FieldMap.EbgCombineMeshData)null },
+        {407, (FieldMap.EbgCombineMeshData)null },
+        {55, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 5 }}},
+        {57, (FieldMap.EbgCombineMeshData)null },
+        {60, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 15, 16 }}},
+        {111, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 10 }}},
+        {153, (FieldMap.EbgCombineMeshData)null },
+        {154, (FieldMap.EbgCombineMeshData)null },
+        {307, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 6, 8 }}},
+        {308, (FieldMap.EbgCombineMeshData)null },
+        {309, (FieldMap.EbgCombineMeshData)null },
+        {507, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 8, 9, 10 }}},
+        {551, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 13 }}},
+        {556, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 27 }}},
+        {566, (FieldMap.EbgCombineMeshData)null },
+        {576, (FieldMap.EbgCombineMeshData)null },
+        {603, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 35 }}},
+        {612, (FieldMap.EbgCombineMeshData)null },
+        {662, (FieldMap.EbgCombineMeshData)null },
+        {705, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 25 }}},
+        {706, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 13 }}},
+        {707, (FieldMap.EbgCombineMeshData)null },
+        {751, (FieldMap.EbgCombineMeshData)null },
+        {755, (FieldMap.EbgCombineMeshData)null },
+        {766, (FieldMap.EbgCombineMeshData)null },
+        {802, (FieldMap.EbgCombineMeshData)null },
+        {810, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 6, 7 }}},
+        {815, (FieldMap.EbgCombineMeshData)null },
+        {910, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 12, 13, 14, 15, 16, 17, 19 }}},
+        {1910, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 12, 13, 14, 15, 16, 17, 19 }}},
+        {916, (FieldMap.EbgCombineMeshData)null },
+        {951, (FieldMap.EbgCombineMeshData)null },
+        {952, (FieldMap.EbgCombineMeshData)null },
+        {957, (FieldMap.EbgCombineMeshData)null },
+        {1056, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 19, 24 }}},
+        {1106, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 19, 24 }}},
+        {1153, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 6, 7 }}},
+        {1206, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 5, 6, 7, 8, 9, 10, 11 }}},
+        {1207, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 7, 8 }}},
+        {1214, (FieldMap.EbgCombineMeshData)null },
+        {1215, (FieldMap.EbgCombineMeshData)null },
+        {1222, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 21, 22, 23, 24, 25 }}},
+        {1223, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 5, 6, 7, 8, 9, 10, 11 }}},
+        {1301, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 13 }}},
+        {1307, (FieldMap.EbgCombineMeshData)null },
+        {1312, (FieldMap.EbgCombineMeshData)null },
+        {1355, (FieldMap.EbgCombineMeshData)null },
+        {1362, (FieldMap.EbgCombineMeshData)null },
+        {1455, (FieldMap.EbgCombineMeshData)null },
+        {3054, (FieldMap.EbgCombineMeshData)null },
+        {1505, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 0, 8, 13 }}},
+        {1950, (FieldMap.EbgCombineMeshData)null },
+        {1225, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 5, 6, 7, 8, 9, 10, 11 }}},
+        {1801, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 5, 6, 7, 8, 9, 10, 11 }}},
+        {1802, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 7, 8 }}},
+        {3002, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 7, 8 }}},
+        {1806, (FieldMap.EbgCombineMeshData)null },
+        {1807, (FieldMap.EbgCombineMeshData)null },
+        {1814, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 21, 22, 23, 24, 25 }}},
+        {1816, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 15, 16, 17, 18, 19 }}},
+        {1823, (FieldMap.EbgCombineMeshData)null },
+        {1852, (FieldMap.EbgCombineMeshData)null },
+        {1860, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 10 }}},
+        {1865, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 17, 18, 20 }}},
+        {2000, (FieldMap.EbgCombineMeshData)null },
+        {2001, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 7, 8 }}},
+        {2101, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 13 }}},
+        {565, (FieldMap.EbgCombineMeshData)null },
+        {2112, (FieldMap.EbgCombineMeshData)null },
+        {605, (FieldMap.EbgCombineMeshData)null },
+        {2155, (FieldMap.EbgCombineMeshData)null },
+        {2162, (FieldMap.EbgCombineMeshData)null },
+        {2200, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25 }}},
+        {2217, (FieldMap.EbgCombineMeshData)null },
+        {2220, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 4, 5, 6, 7 }}},
+        {2221, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 2, 4, 5, 26, 29 }}},
+        {2404, (FieldMap.EbgCombineMeshData)null },
+        {2453, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 1 }}},
+        {2853, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 }}},
+        {2502, (FieldMap.EbgCombineMeshData)null },
+        {2506, (FieldMap.EbgCombineMeshData)null },
+        {2509, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 2, 3 }}},
+        {2652, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 4 }}},
+        {2906, (FieldMap.EbgCombineMeshData)null },
+        {3100, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 38, 40, 46, 47, 48, 49, 50, 52 }}},
+        {2107, new FieldMap.EbgCombineMeshData { skipOverlayList = new List<int> { 0, 1, 2, 3, 4, 5, 12 }}}
     };
 
-    public static List<String> fieldMapNameWithAreaTitle = new List<String>
+    public static readonly List<String> fieldMapNameWithAreaTitle = new List<String>
     {
         "FBG_N01_ALXT_MAP016_AT_MSA_0",
         "FBG_N02_ALXC_MAP042_AC_GDR_0",
@@ -3073,14 +2246,34 @@ public class FieldMap : HonoBehavior
     {
         PsxFieldWidth = CalcPsxFieldWidth();
         PsxScreenWidth = CalcPsxScreenWidth();
-        if (Configuration.Graphics.InitializeWidescreenSupport() && IsNarrowMap())
+        int map = FF9StateSystem.Common.FF9.fldMapNo;
+        //Log.Message("fldMapNo:" + FF9StateSystem.Common.FF9.fldMapNo + " MapWidth:" + NarrowMapList.MapWidth(FF9StateSystem.Common.FF9.fldMapNo) + " PsxFieldWidth:" + PsxFieldWidth + " PsxScreenWidth:" + PsxScreenWidth + " InitializeWidescreenSupport():" + Configuration.Graphics.InitializeWidescreenSupport() + " WidescreenSupport:" + Configuration.Graphics.WidescreenSupport);
+        if (Configuration.Graphics.InitializeWidescreenSupport())
         {
-            foreach (KeyValuePair<int, int> entry in actualNarrowMapWidthDict)
+            Int32 mapWidth = NarrowMapList.MapWidth(map);
+            //Log.Message("Configuration.Graphics.WidescreenSupport " + Configuration.Graphics.WidescreenSupport + " CalcPsxFieldWidth() " + CalcPsxFieldWidth() + " PsxScreenWidth 1 " + CalcPsxScreenWidth() + " Screen.width " + Screen.width + " Screen.height " + Screen.height + "mapWidth " + mapWidth);
+
+            if (mapWidth <= PsxScreenWidth && PersistenSingleton<SceneDirector>.Instance.CurrentScene != "BattleMap")
             {
-                if (FF9StateSystem.Common.FF9.fldMapNo == entry.Key)
+                PsxFieldWidth = (Int16)mapWidth;
+                PsxScreenWidth = (Int16)mapWidth;
+                //Log.Message("PsxScreenWidth 2 " + PsxScreenWidth);
+            }
+        }
+
+        if (map >= 3000 && map <= 3012) //pre-#324 way of doing to fix narrows in ending
+        {
+            PsxFieldWidth = Configuration.Graphics.WidescreenSupport ? CalcPsxFieldWidth() : PsxFieldWidthNative;
+            PsxScreenWidth = Configuration.Graphics.WidescreenSupport ? CalcPsxScreenWidth() : PsxScreenWidthNative;
+            if (Configuration.Graphics.InitializeWidescreenSupport() && IsNarrowMap())
+            {
+                foreach (KeyValuePair<int, int> entry in NarrowMapList.actualNarrowMapWidthDict)
                 {
-                    PsxFieldWidth = (Int16)(entry.Value);
-                    PsxScreenWidth = PsxFieldWidth;
+                    if (FF9StateSystem.Common.FF9.fldMapNo == entry.Key)
+                    {
+                        PsxFieldWidth = (Int16)(entry.Value);
+                        PsxScreenWidth = PsxFieldWidth;
+                    }
                 }
             }
         }
@@ -3090,10 +2283,12 @@ public class FieldMap : HonoBehavior
         ShaderMulY = CalcShaderMulY();
         Shader.SetGlobalFloat("_MulX", ShaderMulX);
         Shader.SetGlobalFloat("_MulY", ShaderMulY);
+        //Log.Message("OnWidescreenSupportChanged()");
+        //Log.Message("HalfFieldWidth " + HalfFieldWidth + " HalfScreenWidth " + HalfScreenWidth + " ShaderMulX " + ShaderMulX + " PsxFieldWidth " + CalcShaderMulX() + " CalcShaderMulX() ");
     }
 
-    private static Int16 CalcPsxFieldWidth() => Configuration.Graphics.WidescreenSupport ? (Int16)(PsxFieldHeightNative * Screen.width / Screen.height) : PsxFieldWidthNative;
-    private static Int16 CalcPsxScreenWidth() => Configuration.Graphics.WidescreenSupport ? (Int16)(PsxScreenHeightNative * Screen.width / Screen.height) : PsxScreenWidthNative;
+    private static Int16 CalcPsxFieldWidth() => Configuration.Graphics.InitializeWidescreenSupport() ? (Int16)(PsxFieldHeightNative * Screen.width / Screen.height) : PsxFieldWidthNative;
+    private static Int16 CalcPsxScreenWidth() => Configuration.Graphics.InitializeWidescreenSupport() ? (Int16)(PsxScreenHeightNative * Screen.width / Screen.height) : PsxScreenWidthNative;
     private static Single CalcShaderMulX() => 1f / HalfFieldWidth;
     private static Single CalcShaderMulY() => 1f / HalfFieldHeight;
 
@@ -3132,4 +2327,15 @@ public class FieldMap : HonoBehavior
                 this.flags &= ~FieldMapFlags.RotationScroll;
         }
     }
+
+    private bool dbug = false;
+
+    private float Prev_CamPositionX, Prev_CamPositionY;
+    private Int16 SmoothCamPercent()
+    {
+        return (Int16)Mathf.Clamp(Configuration.Graphics.CameraStabilizer, 0, 99);
+    }
+    private Int16 SmoothCamDelay;
+    private Vector2 SmoothCamDelta;
+    private Boolean SmoothCamActive;
 }

@@ -568,6 +568,11 @@ public partial class EventEngine
                 {
                     num12 = 2970;
                 }
+                else if (FF9StateSystem.Common.FF9.fldMapNo == 53) // fix for scene where Blank jumps in hole, position adjustment
+                {
+                    if (num11 == 250 && num12 == 1200)
+                        num11 = 330;
+                }
                 Boolean flag2 = this.MoveToward_mixed((Single)num11, 0.0f, (Single)num12, 0, (PosObj)null);
                 eulerAngles1 = po.go.transform.localRotation.eulerAngles;
                 if (flag2)
@@ -1386,6 +1391,7 @@ public partial class EventEngine
             }
             case EBin.event_code_binary.BGSSCROLL:
             {
+                //this.fieldmap.EBG_scene2DScroll((float)this.getv2(), (float)this.getv2(), (UInt16)this.getv1(), (UInt32)this.getv1());
                 this.fieldmap.EBG_scene2DScroll((Int16)this.getv2(), (Int16)this.getv2(), (UInt16)this.getv1(), (UInt32)this.getv1());
                 return 0;
             }
@@ -1602,6 +1608,9 @@ public partial class EventEngine
             case EBin.event_code_binary.CFLAG:
             {
                 Int32 cflag = (Int32)(Byte)this.getv1();
+                // Hotfix: do not hide NPCs when they are offscreen for widescreen compatibility
+                if (cflag == 14 && FF9StateSystem.Common.FF9.fldMapNo == 103 && this.gCur.uid >= 6 && this.gCur.uid <= 17) // In Alexandria/Square, many NPCs and the Jump Rope
+                    return 0;
                 if ((Int32)FF9StateSystem.Common.FF9.fldMapNo == 2934 && MBG.Instance.GetFrame < 10)
                 {
                     this.StartCoroutine(this.DelayedCFLAG(this.gCur, cflag));

@@ -1,3 +1,4 @@
+using Memoria.Prime;
 using System;
 using UnityEngine;
 
@@ -20,6 +21,7 @@ namespace Memoria
             public static Int32 GarnetHair => Instance._graphics.GarnetHair;
             public static Int32 TileSize => Instance._graphics.TileSize;
             public static Int32 AntiAliasing => Instance._graphics.AntiAliasing;
+            public static Int32 CameraStabilizer => Instance._graphics.CameraStabilizer;
 
             private static volatile Boolean _widescreenSupport = InitializeWidescreenSupport();
 
@@ -31,8 +33,12 @@ namespace Memoria
                     return false;
 
                 if ((Math.Abs(((Double)Screen.width / (Double)Screen.height) - (16d / 9d)) < 0.01) || (Math.Abs(((Double)Screen.width / (Double)Screen.height) - (16d / 10d)) < 0.01))
+                {
+                    //Log.Message("WIDESCREEN | Screen.width:" + (Double)Screen.width + " Screen.height:" + (Double)Screen.height);
                     return true;
+                }
 
+                //Log.Message("Not Widescreen | Screen.width:" + (Double)Screen.width + " Screen.height:" + (Double)Screen.height);
                 return false;
             }
             public static Boolean ScreenIs16to10()

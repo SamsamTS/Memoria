@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Reflection;
 using FF9;
 using UnityEngine;
+using Memoria;
 
 public partial class EventEngine
 {
@@ -14,7 +16,7 @@ public partial class EventEngine
                 num = Comn.random8();
                 break;
             case 1:
-                num = this.fieldmap.GetCurrentCameraIndex();
+                num = this.fieldmap.camIdx;
                 break;
             case 2:
                 num = (Int32)this._context.usercontrol;
@@ -75,10 +77,21 @@ public partial class EventEngine
                 break;
             case 19:
                 num = FF9StateSystem.MiniGame.GetNumberOfCards();
+                // Hotfix: in non-modded scripts, number of cards are retrieved either:
+                // - in order to check if the player has at least 5 (for playing with NPCs)
+                // - in order to check if the player has less than 100 (for preventing a card pickup)
+                // - in very special cases (Ticketmaster gifts / finding Hippaul secret cards), in order to check if the player has less than 96 or 98
+                // So we use "Min(95, CardCount)" here except when the card count approaches the MaxCardCount
+                if (Configuration.TetraMaster.MaxCardCount != 100)
+                    num = num + 4 >= Configuration.TetraMaster.MaxCardCount ? 100 - (Configuration.TetraMaster.MaxCardCount - num) : Math.Min(num, 95);
                 //Debug.Log((object)("num of cards = " + (object)num));
                 break;
             case 20:
                 num = Convert.ToInt32(FF9StateSystem.Settings.time);
+                if (Configuration.Hacks.ExcaliburIINoTimeLimit && FF9StateSystem.Common.FF9.fldMapNo == 2919) {
+                    num = 0;
+                    break;
+                }
                 if (num > 8388607)
                 {
                     num = 8388607;
