@@ -70,36 +70,102 @@ public class ShopUI : UIScene
 	{
 		if (!Configuration.Interface.IsEnabled)
 			return;
+		_shopItemPanel.ScrollButton.Panel.alpha = 0.5f;
+		_shopWeaponPanel.ScrollButton.Panel.alpha = 0.5f;
+		_shopSellItemPanel.ScrollButton.Panel.alpha = 0.5f;
 		const Int32 originalLineCount = 8;
+		Int32 originalColumnCount = 1;
 		const Int32 reducedOriginalLineCount = 5;
 		const Single buttonOriginalHeight = 98f;
 		const Single buyPanelOriginalWidth = 916f;
 		const Single panelOriginalHeight = originalLineCount * buttonOriginalHeight;
 		const Single panelReducedOriginalHeight = reducedOriginalLineCount * buttonOriginalHeight;
+
+		// ----------- SHOP CATALOG ----------- //
+
 		Int32 linePerPage = Configuration.Interface.MenuItemRowCount;
+		Int32 columnPerPage = (Int32)Math.Floor((Single)(originalColumnCount * ((Single)linePerPage / originalLineCount)));
+		if (originalColumnCount * originalLineCount >= this.itemIdList.Count) // 1 columns suffice
+		{
+			linePerPage = originalLineCount;
+			columnPerPage = originalColumnCount;
+		}
+
 		Int32 lineHeight = (Int32)Math.Round(panelOriginalHeight / linePerPage);
 		Int32 reducedLinePerPage = (Int32)Math.Round(linePerPage * 0.65f);
 		Int32 reducedLineHeight = (Int32)Math.Round(panelReducedOriginalHeight / reducedLinePerPage);
 		Single scaleFactor = lineHeight / buttonOriginalHeight;
-		_shopItemPanel.SubPanel.ChangeDims(1, linePerPage, buyPanelOriginalWidth, lineHeight);
+
+
+		Single alphaColumnTitles = (columnPerPage > originalColumnCount) ? 0f : 1f;
+		_shopItemPanel.Background.Panel.Name.Label.alpha = alphaColumnTitles;
+		_shopItemPanel.Background.Panel.Info.Label.alpha = alphaColumnTitles;
+		_shopWeaponPanel.Background.Panel.Name.Label.alpha = alphaColumnTitles;
+		_shopWeaponPanel.Background.Panel.Info.Label.alpha = alphaColumnTitles;
+
+		_shopItemPanel.SubPanel.ChangeDims(columnPerPage, linePerPage, buyPanelOriginalWidth / columnPerPage, lineHeight);
 		_shopItemPanel.SubPanel.ButtonPrefab.IconSprite.SetAnchor(target: _shopItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.085f, relRight: 0.155f);
+		_shopItemPanel.SubPanel.ButtonPrefab.IconSprite.width = _shopItemPanel.SubPanel.ButtonPrefab.IconSprite.height;
+
 		_shopItemPanel.SubPanel.ButtonPrefab.NameLabel.SetAnchor(target: _shopItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.175f, relRight: 0.65f);
-		_shopItemPanel.SubPanel.ButtonPrefab.NumberLabel.SetAnchor(target: _shopItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.65f, relRight: 0.92f);
 		_shopItemPanel.SubPanel.ButtonPrefab.NameLabel.fontSize = (Int32)Math.Round(36f * scaleFactor);
+		_shopItemPanel.SubPanel.ButtonPrefab.NameLabel.effectDistance = new Vector2((Int32)Math.Round(4f * scaleFactor), (Int32)Math.Round(4f * scaleFactor));
+
+		_shopItemPanel.SubPanel.ButtonPrefab.NumberLabel.SetAnchor(target: _shopItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.65f, relRight: 0.92f);
+		_shopItemPanel.SubPanel.ButtonPrefab.NumberLabel.fontSize = (Int32)Math.Round(36f * scaleFactor);
+		_shopItemPanel.SubPanel.ButtonPrefab.NumberLabel.effectDistance = new Vector2((Int32)Math.Round(4f * scaleFactor), (Int32)Math.Round(4f * scaleFactor));
 		_shopItemPanel.SubPanel.RecycleListPopulator.RefreshTableView();
-		_shopWeaponPanel.SubPanel.ChangeDims(1, reducedLinePerPage, buyPanelOriginalWidth, reducedLineHeight);
+
+		_shopWeaponPanel.SubPanel.ChangeDims(columnPerPage, reducedLinePerPage, buyPanelOriginalWidth / columnPerPage, reducedLineHeight);
 		_shopWeaponPanel.SubPanel.ButtonPrefab.IconSprite.SetAnchor(target: _shopWeaponPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.085f, relRight: 0.155f);
+		_shopWeaponPanel.SubPanel.ButtonPrefab.IconSprite.width = _shopWeaponPanel.SubPanel.ButtonPrefab.IconSprite.height;
+
 		_shopWeaponPanel.SubPanel.ButtonPrefab.NameLabel.SetAnchor(target: _shopWeaponPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.175f, relRight: 0.65f);
-		_shopWeaponPanel.SubPanel.ButtonPrefab.NumberLabel.SetAnchor(target: _shopWeaponPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.65f, relRight: 0.92f);
 		_shopWeaponPanel.SubPanel.ButtonPrefab.NameLabel.fontSize = (Int32)Math.Round(36f * scaleFactor);
+		_shopWeaponPanel.SubPanel.ButtonPrefab.NameLabel.effectDistance = new Vector2((Int32)Math.Round(4f * scaleFactor), (Int32)Math.Round(4f * scaleFactor));
+
+		_shopWeaponPanel.SubPanel.ButtonPrefab.NumberLabel.SetAnchor(target: _shopWeaponPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.65f, relRight: 0.92f);
+		_shopWeaponPanel.SubPanel.ButtonPrefab.NumberLabel.fontSize = (Int32)Math.Round(36f * scaleFactor);
+		_shopWeaponPanel.SubPanel.ButtonPrefab.NumberLabel.effectDistance = new Vector2((Int32)Math.Round(4f * scaleFactor), (Int32)Math.Round(4f * scaleFactor));
 		_shopWeaponPanel.SubPanel.RecycleListPopulator.RefreshTableView();
+
+		// ----------- SHOP SELLING ----------- //
+
+		originalColumnCount = 2;
+		linePerPage = Configuration.Interface.MenuItemRowCount;
+		columnPerPage = (Int32)Math.Floor((Single)(originalColumnCount * ((Single)linePerPage / originalLineCount)));
+		if (originalColumnCount * originalLineCount >= this.sellItemIdList.Count) // 2 columns suffice
+		{
+			linePerPage = originalLineCount;
+			columnPerPage = originalColumnCount;
+		}
+		else if (linePerPage >= originalLineCount * 2 && (originalColumnCount + 1) * (originalLineCount + originalLineCount / originalColumnCount) >= this.sellItemIdList.Count) // 3 columns suffice
+		{
+			linePerPage = originalLineCount + originalLineCount / originalColumnCount;
+			columnPerPage = originalColumnCount + 1;
+		}
+
+		lineHeight = (Int32)Math.Round(panelOriginalHeight / linePerPage);
+		scaleFactor = lineHeight / buttonOriginalHeight;
+
+		alphaColumnTitles = (columnPerPage > originalColumnCount) ? 0f : 1f;
+		_shopSellItemPanel.Background.Panel.Name.Label.alpha = alphaColumnTitles;
+		_shopSellItemPanel.Background.Panel.Info.Label.alpha = alphaColumnTitles;
+		_shopSellItemPanel.Background.Panel.Name2.Label.alpha = alphaColumnTitles;
+		_shopSellItemPanel.Background.Panel.Info2.Label.alpha = alphaColumnTitles;
+
 		const Single sellPanelOriginalWidth = 1490f;
-		_shopSellItemPanel.SubPanel.ChangeDims(2, linePerPage, sellPanelOriginalWidth / 2f, lineHeight);
+		_shopSellItemPanel.SubPanel.ChangeDims(columnPerPage, linePerPage, sellPanelOriginalWidth / columnPerPage, lineHeight);
 		_shopSellItemPanel.SubPanel.ButtonPrefab.IconSprite.SetAnchor(target: _shopSellItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.105f, relRight: 0.191f);
+		_shopSellItemPanel.SubPanel.ButtonPrefab.IconSprite.width = _shopSellItemPanel.SubPanel.ButtonPrefab.IconSprite.height;
+
 		_shopSellItemPanel.SubPanel.ButtonPrefab.NameLabel.SetAnchor(target: _shopSellItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.215f, relRight: 0.795f);
-		_shopSellItemPanel.SubPanel.ButtonPrefab.NumberLabel.SetAnchor(target: _shopSellItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.8f, relRight: 0.9f);
 		_shopSellItemPanel.SubPanel.ButtonPrefab.NameLabel.fontSize = (Int32)Math.Round(36f * scaleFactor);
+		_shopSellItemPanel.SubPanel.ButtonPrefab.NameLabel.effectDistance = new Vector2((Int32)Math.Round(4f * scaleFactor), (Int32)Math.Round(4f * scaleFactor));
+
+		_shopSellItemPanel.SubPanel.ButtonPrefab.NumberLabel.SetAnchor(target: _shopSellItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.8f, relRight: 0.9f);
 		_shopSellItemPanel.SubPanel.ButtonPrefab.NumberLabel.fontSize = (Int32)Math.Round(36f * scaleFactor);
+		_shopSellItemPanel.SubPanel.ButtonPrefab.NumberLabel.effectDistance = new Vector2((Int32)Math.Round(4f * scaleFactor), (Int32)Math.Round(4f * scaleFactor));
 		_shopSellItemPanel.SubPanel.RecycleListPopulator.RefreshTableView();
 	}
 
@@ -594,7 +660,7 @@ public class ShopUI : UIScene
 		if (shopType == ShopUI.ShopType.Item)
 		{
 			RegularItem itemId = this.itemIdList[this.currentItemIndex];
-			this.itemFundLabel.text = FF9StateSystem.Common.FF9.party.gil.ToString() + "[YSUB=1.3][sub]G";
+			this.itemFundLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", FF9StateSystem.Common.FF9.party.gil.ToString());
 			this.itemCountLabel.text = ff9item.FF9Item_GetCount(itemId).ToString();
 			this.requiredItem1Hud.Self.SetActive(false);
 			this.requiredItem2Hud.Self.SetActive(false);
@@ -602,7 +668,7 @@ public class ShopUI : UIScene
 		else if (shopType == ShopUI.ShopType.Weapon)
 		{
 			RegularItem itemId = this.itemIdList[this.currentItemIndex];
-			this.weaponFundLabel.text = FF9StateSystem.Common.FF9.party.gil.ToString() + "[YSUB=1.3][sub]G";
+			this.weaponFundLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", FF9StateSystem.Common.FF9.party.gil.ToString());
 			this.weaponCountLabel.text = ff9item.FF9Item_GetCount(this.itemIdList[this.currentItemIndex]).ToString();
 			this.weaponEquipLabel.text = ff9item.FF9Item_GetEquipCount(this.itemIdList[this.currentItemIndex]).ToString();
 			if ((ff9item._FF9Item_Data[itemId].type & ItemType.AnyEquipment) != 0)
@@ -621,7 +687,7 @@ public class ShopUI : UIScene
 		else if (shopType == ShopUI.ShopType.Synthesis)
 		{
 			FF9MIX_DATA synth = this.mixItemList[this.currentItemIndex - this.mixStartIndex];
-			this.weaponFundLabel.text = FF9StateSystem.Common.FF9.party.gil.ToString() + "[YSUB=1.3][sub]G";
+			this.weaponFundLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", FF9StateSystem.Common.FF9.party.gil.ToString());
 			this.weaponCountLabel.text = ff9item.FF9Item_GetCount(synth.Result).ToString();
 			this.weaponEquipLabel.text = ff9item.FF9Item_GetEquipCount(synth.Result).ToString();
 			if ((ff9item._FF9Item_Data[synth.Result].type & ItemType.AnyEquipment) != 0)
@@ -681,9 +747,9 @@ public class ShopUI : UIScene
 		this.itemIdList.Clear();
 		this.isItemEnableList.Clear();
 		List<ListDataTypeBase> list = new List<ListDataTypeBase>();
-	    ShopItems assortiment = ff9buy.ShopItems[this.id];
+		ShopItems assortiment = ff9buy.ShopItems[this.id];
 
-        for (Int32 i = 0; i < assortiment.Length; i++)
+		for (Int32 i = 0; i < assortiment.Length; i++)
 		{
 			RegularItem itemId = assortiment[i];
 			FF9ITEM_DATA item = ff9item._FF9Item_Data[itemId];
@@ -742,9 +808,9 @@ public class ShopUI : UIScene
 		List<ListDataTypeBase> list = new List<ListDataTypeBase>();
 		if (this.type == ShopUI.ShopType.Weapon)
 		{
-		    ShopItems assortiment = ff9buy.ShopItems[this.id];
+			ShopItems assortiment = ff9buy.ShopItems[this.id];
 
-            for (Int32 i = 0; i < assortiment.Length; i++)
+			for (Int32 i = 0; i < assortiment.Length; i++)
 			{
 				RegularItem itemId = assortiment[i];
 				FF9ITEM_DATA item = ff9item._FF9Item_Data[itemId];
@@ -906,7 +972,7 @@ public class ShopUI : UIScene
 				}
 				else
 				{
-				    CharacterEquipment equipCopy = player.equip.Clone();
+					CharacterEquipment equipCopy = player.equip.Clone();
 					equipCopy[equipPart] = currentItemId;
 					oldRating = ff9shop.FF9Shop_GetDefence(equipPart, player.equip);
 					newRating = ff9shop.FF9Shop_GetDefence(equipPart, equipCopy);
@@ -960,13 +1026,13 @@ public class ShopUI : UIScene
 			{
 				FF9UIDataTool.DisplayTextLocalize(this.HelpLabel, "BuyQtyHelp");
 				FF9UIDataTool.DisplayItem(this.itemIdList[this.currentItemIndex], this.confirmItemHud.IconSprite, this.confirmItemHud.NameLabel, true);
-				this.confirmPriceLabel.text = (this.count * ff9item._FF9Item_Data[this.itemIdList[this.currentItemIndex]].price).ToString() + "[YSUB=1.3][sub]G";
+				this.confirmPriceLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", (this.count * ff9item._FF9Item_Data[this.itemIdList[this.currentItemIndex]].price).ToString());
 			}
 			else
 			{
 				FF9UIDataTool.DisplayTextLocalize(this.HelpLabel, "MixQtyHelp");
 				FF9UIDataTool.DisplayItem(this.mixItemList[this.currentItemIndex - this.mixStartIndex].Result, this.confirmItemHud.IconSprite, this.confirmItemHud.NameLabel, true);
-				this.confirmPriceLabel.text = (this.count * this.mixItemList[this.currentItemIndex - this.mixStartIndex].Price).ToString() + "[YSUB=1.3][sub]G";
+				this.confirmPriceLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", (this.count * this.mixItemList[this.currentItemIndex - this.mixStartIndex].Price).ToString());
 			}
 		}
 		else
@@ -979,9 +1045,9 @@ public class ShopUI : UIScene
 			FF9UIDataTool.DisplayItem(itemId, this.confirmItemHud.IconSprite, this.confirmItemHud.NameLabel, true);
 			UInt32 sellingPrice = ff9item._FF9Item_Data[itemId].price >> 1;
 			this.confirmQuantityLabel.text = this.count.ToString();
-			this.confirmPriceLabel.text = (this.count * sellingPrice).ToString() + "[YSUB=1.3][sub]G";
+			this.confirmPriceLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", (this.count * sellingPrice).ToString());
 			Boolean isEquipment = (ff9item._FF9Item_Data[itemId].type & ItemType.AnyEquipment) != 0;
-			this.confirmFundLabel.text = FF9StateSystem.Common.FF9.party.gil.ToString() + "[YSUB=1.3][sub]G";
+			this.confirmFundLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", FF9StateSystem.Common.FF9.party.gil.ToString());
 			this.confirmCountLabel.text = ff9item.FF9Item_GetCount(itemId).ToString();
 			if (isEquipment)
 			{
@@ -1015,12 +1081,12 @@ public class ShopUI : UIScene
 	{
 		if (shopType == ShopUI.ShopType.Item)
 		{
-			this.itemFundLabel.text = FF9StateSystem.Common.FF9.party.gil.ToString() + "[YSUB=1.3][sub]G";
+			this.itemFundLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", FF9StateSystem.Common.FF9.party.gil.ToString());
 			this.itemCountLabel.text = "0";
 		}
 		else if (shopType == ShopUI.ShopType.Weapon)
 		{
-			this.weaponFundLabel.text = FF9StateSystem.Common.FF9.party.gil.ToString() + "[YSUB=1.3][sub]G";
+			this.weaponFundLabel.text = Localization.GetWithDefault("GilSymbol").Replace("%", FF9StateSystem.Common.FF9.party.gil.ToString());
 			this.weaponCountLabel.text = "0";
 			this.weaponEquipTextLabel.color = FF9TextTool.Gray;
 			this.weaponEquipLabel.color = FF9TextTool.Gray;
@@ -1043,17 +1109,17 @@ public class ShopUI : UIScene
 				this.availableCharaList.Add(player.info.slot_no);
 	}
 
-    private void InitializeMixList()
-    {
-        foreach (FF9MIX_DATA data in ff9mix.SynthesisData.Values)
+	private void InitializeMixList()
+	{
+		foreach (FF9MIX_DATA data in ff9mix.SynthesisData.Values)
 			if (data.Shops.Contains(this.id) && data.Result != RegularItem.NoItem)
 				mixItemList.Add(data);
 
-        foreach (FF9MIX_DATA data in mixItemList)
+		foreach (FF9MIX_DATA data in mixItemList)
 			this.mixPartyList.Add((ff9item._FF9Item_Data[data.Result].type & ItemType.AnyEquipment) != 0);
-    }
+	}
 
-    private void StartCountItem()
+	private void StartCountItem()
 	{
 		RegularItem itemId = this.itemIdList[this.currentItemIndex];
 		Int32 itemCount = ff9item.FF9Item_GetCount(itemId);
@@ -1139,6 +1205,7 @@ public class ShopUI : UIScene
 			this.DisplaySellItem();
 			this.shopSellItemScrollList.JumpToIndex(0, false);
 		}
+		this.UpdateUserInterface();
 	}
 
 	private ShopUI.SubMenu GetSubMenuFromGameObject(GameObject go)

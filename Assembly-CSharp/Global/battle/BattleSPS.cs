@@ -4,7 +4,7 @@ using System.IO;
 using Memoria.Scripts;
 using UnityEngine;
 
-public class BattleSPS : MonoBehaviour
+public partial class BattleSPS : MonoBehaviour
 {
 	public void Init()
 	{
@@ -397,7 +397,13 @@ public class BattleSPS : MonoBehaviour
 
 	public Vector3 rot;
 
-	public Vector3 rotArg;
+    public Boolean rotate;
+
+    public BTL_DATA btl;
+
+    public Int32 bone;
+
+    public Vector3 rotArg;
 
 	public Vector3 posOffset;
 
