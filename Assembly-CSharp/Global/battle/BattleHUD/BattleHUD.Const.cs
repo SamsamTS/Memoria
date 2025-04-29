@@ -1,14 +1,14 @@
 ﻿using Assets.Sources.Scripts.UI.Common;
 using FF9;
-using System;
-using System.Collections.Generic;
-using System.IO;
 using Memoria;
 using Memoria.Assets;
 using Memoria.Data;
 using Memoria.Database;
 using Memoria.Prime;
 using Memoria.Prime.CSV;
+using System;
+using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 public partial class BattleHUD : UIScene
@@ -27,62 +27,63 @@ public partial class BattleHUD : UIScene
     public const String AbilityGroupButton = "Battle.Ability";
     public const String ItemGroupButton = "Battle.Item";
 
-    private static readonly Byte[] BattleMessageTimeTick = new Byte[7] {54, 46, 48, 30, 24, 18, 12};
+    public const String ATENormal = "battle_bar_atb";
+    public const String ATEGray = "battle_bar_slow";
+    public const String ATEOrange = "battle_bar_haste";
+
+    private static readonly Byte[] BattleMessageTimeTick = [54, 46, 48, 30, 24, 18, 12];
     private static readonly Dictionary<BattleAbilityId, IdMap> CmdTitleTable;
     private static readonly Int32 YINFO_ANIM_HPMP_MIN = 4;
     private static readonly Int32 YINFO_ANIM_HPMP_MAX = 16;
-    private static readonly Int32 AbilFenril = 66;
-    private static readonly Int32 AbilCarbuncle = 68;
-    private static readonly Int32 AbilSaMpHalf = 226;
-    private static readonly String ATENormal = "battle_bar_atb";
-    private static readonly String ATEGray = "battle_bar_slow";
-    private static readonly String ATEOrange = "battle_bar_haste";
     private static readonly Single DefaultPartyPanelPosY = -420f;
     private static readonly Single PartyItemHeight = 60f;
-    public static Dictionary<BattleStatus, String> DebuffIconNames;
-    public static Dictionary<BattleStatus, String> BuffIconNames;
+    public static Dictionary<BattleStatusId, String> DebuffIconNames;
+    public static Dictionary<BattleStatusId, String> BuffIconNames;
     private static readonly Color[] TranceTextColor;
 
     static BattleHUD()
     {
+        // Ignore "CommandTitles.csv" for good
+        /*
         CmdTitleTable = LoadBattleCommandTitles();
         foreach (IdMap mappingId in CmdTitleTable.Values)
             if (FF9BattleDB.CharacterActions.ContainsKey(mappingId.Id))
                 FF9BattleDB.CharacterActions[mappingId.Id].CastingTitleType = mappingId.MappedId;
+        */
 
-        DebuffIconNames = new Dictionary<BattleStatus, String>
+        DebuffIconNames = new Dictionary<BattleStatusId, String>
         {
-            {BattleStatus.Slow, FF9UIDataTool.IconSpriteName[139]},
-            {BattleStatus.Freeze, FF9UIDataTool.IconSpriteName[140]},
-            {BattleStatus.Heat, FF9UIDataTool.IconSpriteName[141]},
-            {BattleStatus.Mini, FF9UIDataTool.IconSpriteName[142]},
-            {BattleStatus.Sleep, FF9UIDataTool.IconSpriteName[143]},
-            {BattleStatus.Poison, FF9UIDataTool.IconSpriteName[144]},
-            {BattleStatus.Stop, FF9UIDataTool.IconSpriteName[145]},
-            {BattleStatus.Berserk, FF9UIDataTool.IconSpriteName[146]},
-            {BattleStatus.Confuse, FF9UIDataTool.IconSpriteName[147]},
-            {BattleStatus.Zombie, FF9UIDataTool.IconSpriteName[148]},
-            {BattleStatus.Trouble, FF9UIDataTool.IconSpriteName[149]},
-            {BattleStatus.Blind, FF9UIDataTool.IconSpriteName[150]},
-            {BattleStatus.Silence, FF9UIDataTool.IconSpriteName[151]},
-            {BattleStatus.Virus, FF9UIDataTool.IconSpriteName[152]},
-            {BattleStatus.Venom, FF9UIDataTool.IconSpriteName[153]},
-            {BattleStatus.Petrify, FF9UIDataTool.IconSpriteName[154]}
+            {BattleStatusId.Slow,    FF9UIDataTool.IconSpriteName[139]},
+            {BattleStatusId.Freeze,  FF9UIDataTool.IconSpriteName[140]},
+            {BattleStatusId.Heat,    FF9UIDataTool.IconSpriteName[141]},
+            {BattleStatusId.Mini,    FF9UIDataTool.IconSpriteName[142]},
+            {BattleStatusId.Sleep,   FF9UIDataTool.IconSpriteName[143]},
+            {BattleStatusId.Poison,  FF9UIDataTool.IconSpriteName[144]},
+            {BattleStatusId.Stop,    FF9UIDataTool.IconSpriteName[145]},
+            {BattleStatusId.Berserk, FF9UIDataTool.IconSpriteName[146]},
+            {BattleStatusId.Confuse, FF9UIDataTool.IconSpriteName[147]},
+            {BattleStatusId.Zombie,  FF9UIDataTool.IconSpriteName[148]},
+            {BattleStatusId.Trouble, FF9UIDataTool.IconSpriteName[149]},
+            {BattleStatusId.Blind,   FF9UIDataTool.IconSpriteName[150]},
+            {BattleStatusId.Silence, FF9UIDataTool.IconSpriteName[151]},
+            {BattleStatusId.Virus,   FF9UIDataTool.IconSpriteName[152]},
+            {BattleStatusId.Venom,   FF9UIDataTool.IconSpriteName[153]},
+            {BattleStatusId.Petrify, FF9UIDataTool.IconSpriteName[154]}
         };
 
-        BuffIconNames = new Dictionary<BattleStatus, String>
+        BuffIconNames = new Dictionary<BattleStatusId, String>
         {
-            {BattleStatus.AutoLife, FF9UIDataTool.IconSpriteName[131]},
-            {BattleStatus.Reflect, FF9UIDataTool.IconSpriteName[132]},
-            {BattleStatus.Vanish, FF9UIDataTool.IconSpriteName[133]},
-            {BattleStatus.Protect, FF9UIDataTool.IconSpriteName[134]},
-            {BattleStatus.Shell, FF9UIDataTool.IconSpriteName[135]},
-            {BattleStatus.Float, FF9UIDataTool.IconSpriteName[136]},
-            {BattleStatus.Haste, FF9UIDataTool.IconSpriteName[137]},
-            {BattleStatus.Regen, FF9UIDataTool.IconSpriteName[138]}
+            {BattleStatusId.AutoLife, FF9UIDataTool.IconSpriteName[131]},
+            {BattleStatusId.Reflect,  FF9UIDataTool.IconSpriteName[132]},
+            {BattleStatusId.Vanish,   FF9UIDataTool.IconSpriteName[133]},
+            {BattleStatusId.Protect,  FF9UIDataTool.IconSpriteName[134]},
+            {BattleStatusId.Shell,    FF9UIDataTool.IconSpriteName[135]},
+            {BattleStatusId.Float,    FF9UIDataTool.IconSpriteName[136]},
+            {BattleStatusId.Haste,    FF9UIDataTool.IconSpriteName[137]},
+            {BattleStatusId.Regen,    FF9UIDataTool.IconSpriteName[138]}
         };
 
-        TranceTextColor = new[]
+        TranceTextColor = new Color[]
         {
             // 13
             new Color(1f, 0.2156863f, 0.3176471f),
@@ -105,14 +106,16 @@ public partial class BattleHUD : UIScene
     {
         // TODO: Move it to an external file
         String abilityName = FF9TextTool.ActionAbilityName(btl_util.GetCommandMainActionIndex(pCmd));
-        
-        String result;
-        if (TryFormatRussianMagicSwordAbility(abilityName, out result))
+
+        if (TryFormatRussianMagicSwordAbility(abilityName, out String result))
             return result;
 
         String commandTitle = FF9TextTool.BattleCommandTitleText(0);
+        Int32 replacePos = commandTitle.IndexOf('%');
+        if (replacePos >= 0)
+            return commandTitle.Substring(0, replacePos) + abilityName + commandTitle.Substring(replacePos + 1);
 
-        switch (Localization.GetSymbol())
+        switch (Localization.CurrentDisplaySymbol)
         {
             case "JP":
                 return $"{abilityName}{commandTitle}";
@@ -120,8 +123,19 @@ public partial class BattleHUD : UIScene
             case "IT":
             case "ES":
                 return $"{commandTitle}{abilityName}";
+            case "US":
+            case "UK":
+                if (String.Equals(commandTitle, "Sword"))
+                    return $"{abilityName} {commandTitle}";
+                return $"{commandTitle}{abilityName}";
+            case "GR":
+                // Thanks to McPerser for reporting that translation error
+                // https://finalfantasy.fandom.com/de/wiki/Magieschwert_(FFIX)
+                if (String.Equals(commandTitle, "Aklinge"))
+                    return $"{abilityName}klinge";
+                return $"{commandTitle}{abilityName}";
             default:
-                return $"{abilityName} {commandTitle}";
+                return $"{commandTitle}{abilityName}";
         }
     }
 
@@ -200,53 +214,20 @@ public partial class BattleHUD : UIScene
         return false;
     }
 
-    private static BattleCommandId GetCommandFromCommandIndex(ref BattleCommandMenu commandIndex, Int32 playerIndex)
+    private static BattleCommandId GetCommandFromCommandIndex(BattleCommandMenu commandIndex, Int32 playerIndex)
     {
         BattleUnit player = FF9StateSystem.Battle.FF9Battle.GetUnit(playerIndex);
-        CharacterPresetId presetId = FF9StateSystem.Common.FF9.party.GetCharacter(player.Position).PresetId;
-        BattleCommandId result = BattleCommandId.None;
-        switch (commandIndex)
+        CharacterPresetId presetId = FF9StateSystem.Common.FF9.party.member[player.Position].PresetId;
+        if ((Int32)commandIndex >= 0 && (Int32)commandIndex < CharacterCommandSet.SupportedMenus.Count)
         {
-            case BattleCommandMenu.Attack:
-                result = BattleCommandId.Attack;
-                break;
-            case BattleCommandMenu.Defend:
-                result = BattleCommandId.Defend;
-                if (Configuration.Mod.TranceSeek) // [DV] - Change Steiner/Amarant's Defend Command 
-                {
-                    if (presetId == CharacterPresetId.Steiner) // Sentinel
-                        result = (BattleCommandId)10015;
-                    else if (presetId == CharacterPresetId.Amarant) // Dual
-                        result = (BattleCommandId)10016;
-                }
-                break;
-            case BattleCommandMenu.Ability1:
-            {
-                CharacterCommandSet commandSet = CharacterCommands.CommandSets[presetId];
-                Boolean underTrance = player.IsUnderAnyStatus(BattleStatus.Trance);
-                result = commandSet.Get(underTrance, 0);
-                break;
-            }
-            case BattleCommandMenu.Ability2:
-            {
-                CharacterCommandSet commandSet = CharacterCommands.CommandSets[presetId];
-                Boolean underTrance = player.IsUnderAnyStatus(BattleStatus.Trance);
-                result = commandSet.Get(underTrance, 1);
-                break;
-            }
-            case BattleCommandMenu.Item:
-                result = BattleCommandId.Item;
-                break;
-            case BattleCommandMenu.Change:
-                result = BattleCommandId.Change;
-                break;
+            BattleCommandId result = CharacterCommands.CommandSets[presetId].Get(player.IsUnderAnyStatus(BattleStatus.Trance), commandIndex);
+            return BattleCommandHelper.Patch(result, commandIndex, player.Player, player);
         }
-        if (player.Data.is_monster_transform && result == player.Data.monster_transform.base_command)
+        else if (commandIndex == BattleCommandMenu.AccessMenu)
         {
-            result = player.Data.monster_transform.new_command;
-            commandIndex = BattleCommandMenu.Ability1;
+            return BattleCommandHelper.Patch(BattleCommandId.AccessMenu, commandIndex, player.Player, player);
         }
-        return result;
+        return BattleCommandId.None;
     }
 
     private static Int32 GetFirstAlivePlayerIndex()
@@ -279,7 +260,7 @@ public partial class BattleHUD : UIScene
             if (unit.CurrentHp <= 0)
                 continue;
 
-            if (unit.IsUnderAnyStatus(BattleStatus.Confuse | BattleStatus.Sleep))
+            if (unit.IsUnderAnyStatus(BattleStatusConst.RemoveOnPhysicallyAttacked))
                 return index;
 
             if (unit.CurrentHp < minHp)

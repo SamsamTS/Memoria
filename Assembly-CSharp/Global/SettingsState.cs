@@ -2,11 +2,12 @@
 using Assets.SiliconSocial;
 using Assets.Sources.Scripts.UI.Common;
 using FF9;
-using System;
 using Memoria;
 using Memoria.Assets;
 using Memoria.Data;
+using Memoria.Prime;
 using Memoria.Speedrun;
+using System;
 using UnityEngine;
 
 #pragma warning disable 169
@@ -98,33 +99,7 @@ public class SettingsState : MonoBehaviour
                 Debug.Log("serializer.ReadSystemData.callback 1 ReadSystemData : ScreenRotation = " + ScreenRotation);
                 LatestSlot = metaData.LatestSlot;
                 LatestSave = metaData.LatestSave;
-                switch (metaData.SelectedLanguage)
-                {
-                    case 0:
-                        CurrentLanguage = "English(US)";
-                        break;
-                    case 1:
-                        CurrentLanguage = "English(UK)";
-                        break;
-                    case 2:
-                        CurrentLanguage = "Japanese";
-                        break;
-                    case 3:
-                        CurrentLanguage = "German";
-                        break;
-                    case 4:
-                        CurrentLanguage = "French";
-                        break;
-                    case 5:
-                        CurrentLanguage = "Italian";
-                        break;
-                    case 6:
-                        CurrentLanguage = "Spanish";
-                        break;
-                    default:
-                        CurrentLanguage = GetSystemLanguage();
-                        break;
-                }
+                CurrentLanguage = LanguageName.ConvertToLanguageName(metaData.SelectedLanguage);
             }
             else
             {
@@ -133,11 +108,14 @@ public class SettingsState : MonoBehaviour
                 CurrentLanguage = GetSystemLanguage();
                 Debug.Log("serializer.ReadSystemData.callback 2 ReadSystemData : fail");
             }
+            if (Configuration.VoiceActing.ForceLanguage >= 0)
+            {
+                CurrentLanguage = LanguageName.ConvertToLanguageName(Configuration.VoiceActing.ForceLanguage);
+                Log.Message($"[VoiceActing] Language forced to '{CurrentLanguage}'");
+            }
             PersistenSingleton<UIManager>.Instance.TitleScene.SetRotateScreen();
-            Localization.CurrentLanguage = CurrentLanguage;
-            UIManager.Field.InitializeATEText();
-            StartCoroutine(PersistenSingleton<FF9TextTool>.Instance.UpdateTextLocalization(callback));
-            EventInput.ChangeInputLayout(CurrentLanguage);
+            Localization.SetCurrentLanguage(CurrentLanguage, this, callback);
+            EventInput.UpdateInputLayout();
         };
 
         FF9StateSystem.Serializer.ReadSystemData(func);
@@ -181,19 +159,19 @@ public class SettingsState : MonoBehaviour
         switch (systemLanguage)
         {
             case SystemLanguage.English:
-                return "English(US)";
+                return LanguageName.EnglishUS;
             case SystemLanguage.French:
-                return "French";
+                return LanguageName.French;
             case SystemLanguage.German:
-                return "German";
+                return LanguageName.German;
             case SystemLanguage.Italian:
-                return "Italian";
+                return LanguageName.Italian;
             case SystemLanguage.Japanese:
-                return "Japanese";
+                return LanguageName.Japanese;
             case SystemLanguage.Spanish:
-                return "Spanish";
+                return LanguageName.Spanish;
             default:
-                return "English(US)";
+                return LanguageName.EnglishUS;
         }
     }
 
@@ -201,12 +179,7 @@ public class SettingsState : MonoBehaviour
     {
         ISharedDataSerializer.OnSetSelectedLanguage func = errNo =>
         {
-            //if (errNo != DataSerializerErrorCode.Success)
-            //    ;
-            CurrentLanguage = language;
-            Localization.CurrentLanguage = language;
-            UIManager.Field.InitializeATEText();
-            StartCoroutine(PersistenSingleton<FF9TextTool>.Instance.UpdateTextLocalization(callback));
+            Localization.SetCurrentLanguage(language, this, callback);
         };
 
         FF9StateSystem.Serializer.SetSelectedLanguage(LanguageName.ConvertToLanguageCode(language), func);
@@ -216,13 +189,10 @@ public class SettingsState : MonoBehaviour
     {
         ISharedDataSerializer.OnSetScreenRotation func = errNo =>
         {
-            //if (errNo != DataSerializerErrorCode.Success)
-            //    ;
             ScreenRotation = screenRotation;
             Debug.Log("FF9StateSystem.Serializer.SetScreenRotation: errNo = " + errNo + ", screenRotation = " + screenRotation + ", ScreenRotation = " + ScreenRotation);
-            if (callback == null)
-                return;
-            callback();
+            if (callback != null)
+                callback();
         };
 
         Debug.Log("SettingsState.SetScreenRotation screenRotation = " + screenRotation);
@@ -299,10 +269,8 @@ public class SettingsState : MonoBehaviour
         if (!IsATBFull || !SceneDirector.IsBattleScene())
             return;
         for (BTL_DATA btl = FF9StateSystem.Battle.FF9Battle.btl_list.next; btl != null; btl = btl.next)
-        {
-            if (btl.bi.player != 0 && !Status.checkCurStat(btl, BattleStatus.Death))
+            if (btl.bi.player != 0 && !btl_stat.CheckStatus(btl, BattleStatus.Death))
                 btl.cur.at = btl.max.at;
-        }
     }
 
     public void SetHPFull()
@@ -311,7 +279,7 @@ public class SettingsState : MonoBehaviour
             return;
         for (BTL_DATA btl = FF9StateSystem.Battle.FF9Battle.btl_list.next; btl != null; btl = btl.next)
         {
-            if (btl.bi.player != 0 && !Status.checkCurStat(btl, BattleStatus.Death))
+            if (btl.bi.player != 0 && !btl_stat.CheckStatus(btl, BattleStatus.Death))
             {
                 btl.cur.hp = btl.max.hp;
                 btl.cur.mp = btl.max.mp;
@@ -330,7 +298,7 @@ public class SettingsState : MonoBehaviour
             {
                 btl.Trance = Byte.MaxValue;
                 if (!btl.IsUnderAnyStatus(BattleStatus.Trance))
-                    btl.AlterStatus(BattleStatus.Trance);
+                    btl.AlterStatus(BattleStatusId.Trance);
             }
         }
     }
@@ -401,7 +369,7 @@ public class SettingsState : MonoBehaviour
                         Int32 abilIndex = ff9abil.FF9Abil_GetIndex(player, abilId);
                         if (abilIndex > -1)
                         {
-                            player.pa[abilIndex] = (Byte)ff9abil.FF9Abil_GetMax(player, abilId);
+                            player.pa[abilIndex] = ff9abil.FF9Abil_GetMax(player, abilId);
                             if (BattleAchievement.UpdateAbilitiesAchievement(abilId, false))
                                 gotAchievement = true;
                         }
@@ -418,7 +386,7 @@ public class SettingsState : MonoBehaviour
                         Int32 abilIndex = ff9abil.FF9Abil_GetIndex(player, abilId);
                         if (abilIndex > -1)
                         {
-                            player.pa[abilIndex] = (Byte)ff9abil.FF9Abil_GetMax(player, abilId);
+                            player.pa[abilIndex] = ff9abil.FF9Abil_GetMax(player, abilId);
                             if (BattleAchievement.UpdateAbilitiesAchievement(abilId, false))
                                 gotAchievement = true;
                         }
@@ -449,9 +417,9 @@ public class SettingsState : MonoBehaviour
         {
             player.SetMaxBonusBasisStatus();
             ff9play.FF9Play_ChangeLevel(player, ff9level.LEVEL_COUNT, false);
-            Int32 num = player.max.capa - player.cur.capa;
-            player.max.capa = 99;
-            player.cur.capa = (Byte)(99 - num);
+            UInt32 gemUsage = player.max.capa - player.cur.capa;
+            player.max.capa = UInt32.MaxValue;
+            player.cur.capa = UInt32.MaxValue - gemUsage;
         }
         AchievementManager.ReportAchievement(AcheivementKey.CharLv99, 1);
     }

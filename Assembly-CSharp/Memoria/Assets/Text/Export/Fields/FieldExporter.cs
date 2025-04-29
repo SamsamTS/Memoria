@@ -1,7 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Globalization;
+using System.Collections.Generic;
 using Assets.Sources.Scripts.UI.Common;
 using Memoria.Prime;
 using ExtensionMethodsIEnumerable = Memoria.Scenes.ExtensionMethodsIEnumerable;
@@ -36,8 +37,9 @@ namespace Memoria.Assets
                         continue;
 
                     String name = fieldZoneId.ToString("D4", CultureInfo.InvariantCulture) + '_' + pair.Value;
-                    text = TextOpCodeModifier.Modify(text);
-                    String[] lines = FF9TextTool.ExtractSentense(text);
+                    String[] lines = FF9TextTool.ExtractSentense(new Dictionary<Int32, String>(), text).Values.ToArray();
+                    for (Int32 i = 0; i < lines.Length; i++)
+                        lines[i] = TextOpCodeModifier.Modify(lines[i], i);
 
                     TxtEntry[] commands = formatter.Build(name, lines);
 

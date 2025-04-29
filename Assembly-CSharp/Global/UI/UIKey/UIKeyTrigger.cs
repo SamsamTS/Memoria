@@ -1,5 +1,6 @@
 ﻿using Assets.Scripts.Common;
 using Memoria;
+using Memoria.Assets;
 using Memoria.Data;
 using Memoria.Prime;
 using Memoria.Prime.Text;
@@ -9,6 +10,7 @@ using Memoria.Test;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 #pragma warning disable 169
@@ -50,6 +52,22 @@ public class UIKeyTrigger : MonoBehaviour
     private Boolean MKeyDown => UnityXInput.Input.GetKeyDown(KeyCode.M);
     private Boolean SKeyDown => UnityXInput.Input.GetKeyDown(KeyCode.S);
 
+    private Boolean SoftResetKeyPSXDown => // L1 + R1 + L2 + R2 + start + select
+        PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.LeftBumper) && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.LeftTrigger)
+        && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.RightBumper) && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.RightTrigger)
+        && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.Pause) && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.Select)
+        || keyCommand == Control.LeftBumper && keyCommand == Control.LeftTrigger && keyCommand == Control.RightBumper && keyCommand == Control.RightTrigger
+        && keyCommand == Control.Pause && keyCommand == Control.Select || UIManager.Input.GetKey(Control.LeftBumper) && UIManager.Input.GetKey(Control.LeftTrigger)
+        && UIManager.Input.GetKey(Control.RightBumper) && UIManager.Input.GetKey(Control.RightTrigger) && UIManager.Input.GetKey(Control.Pause) && UIManager.Input.GetKey(Control.Select);
+
+    private Boolean SoftResetKeyPSXForPause => // L1 + R1 + L2 + R2 + select
+    PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.LeftBumper) && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.LeftTrigger)
+    && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.RightBumper) && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.RightTrigger)
+    && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.Select)
+    || keyCommand == Control.LeftBumper && keyCommand == Control.LeftTrigger && keyCommand == Control.RightBumper && keyCommand == Control.RightTrigger
+    && keyCommand == Control.Select || UIManager.Input.GetKey(Control.LeftBumper) && UIManager.Input.GetKey(Control.LeftTrigger)
+    && UIManager.Input.GetKey(Control.RightBumper) && UIManager.Input.GetKey(Control.RightTrigger) && UIManager.Input.GetKey(Control.Select);
+
     public UIKeyTrigger()
     {
         keyCommand = Control.None;
@@ -63,7 +81,7 @@ public class UIKeyTrigger : MonoBehaviour
 
     public static Boolean IsNeedToRemap()
     {
-        return Application.platform == RuntimePlatform.Android && PersistenSingleton<UIManager>.Instance.Dialogs.IsDialogNeedControl() && (PersistenSingleton<UIManager>.Instance.Dialogs.GetChoiceDialog() == null && EventHUD.CurrentHUD == MinigameHUD.None);
+        return Application.platform == RuntimePlatform.Android && PersistenSingleton<UIManager>.Instance.Dialogs.IsDialogNeedControl() && PersistenSingleton<UIManager>.Instance.Dialogs.GetChoiceDialog() == null && EventHUD.CurrentHUD == MinigameHUD.None;
     }
 
     public void ResetTriggerEvent()
@@ -108,38 +126,51 @@ public class UIKeyTrigger : MonoBehaviour
 
     private void Update()
     {
-        GameLoopManager.RaiseUpdateEvent();
+        try
+        {
+            GameLoopManager.RaiseUpdateEvent();
 
-        if (UnityXInput.Input.GetAxis("Mouse X") < 1.0 / 1000.0 && UnityXInput.Input.GetAxis("Mouse Y") < 1.0 / 1000.0)
-        {
-            disableMouseCounter += Time.deltaTime;
+            if (UnityXInput.Input.GetAxis("Mouse X") < 1.0 / 1000.0 && UnityXInput.Input.GetAxis("Mouse Y") < 1.0 / 1000.0)
+            {
+                disableMouseCounter += Time.deltaTime;
+            }
+            else
+            {
+                disableMouseCounter = 0.0f;
+                if (!UICamera.list[0].useMouse)
+                    UICamera.list[0].useMouse = true;
+            }
+            if (UnityXInput.Input.GetMouseButton(0) || UnityXInput.Input.GetMouseButton(1) || (UnityXInput.Input.GetMouseButton(2) || Mathf.Abs(UnityXInput.Input.GetAxis("Mouse ScrollWheel")) > 0.00999999977648258))
+            {
+                disableMouseCounter = 0.0f;
+                if (!UICamera.list[0].useMouse)
+                    UICamera.list[0].useMouse = true;
+            }
+            if (disableMouseCounter > 1.0 && UICamera.list[0].useMouse)
+                UICamera.list[0].useMouse = false;
+            if (!UnityXInput.Input.anyKey && !isLockLazyInput)
+                ResetKeyCode();
+            if (Configuration.Lang.DualLanguageMode == 1)
+                Localization.UseSecondaryLanguage = IsKeyLocked(LockKey.Caps);
+            AccelerateKeyNavigation();
+            if (HandleMenuControlKeyPressCustomInput())
+                return;
+            HandleBoosterButton();
+            HandleDialogControlKeyPressCustomInput();
         }
-        else
+        catch (Exception err)
         {
-            disableMouseCounter = 0.0f;
-            if (!UICamera.list[0].useMouse)
-                UICamera.list[0].useMouse = true;
+            Log.Error(err);
         }
-        if (UnityXInput.Input.GetMouseButton(0) || UnityXInput.Input.GetMouseButton(1) || (UnityXInput.Input.GetMouseButton(2) || Mathf.Abs(UnityXInput.Input.GetAxis("Mouse ScrollWheel")) > 0.00999999977648258))
-        {
-            disableMouseCounter = 0.0f;
-            if (!UICamera.list[0].useMouse)
-                UICamera.list[0].useMouse = true;
-        }
-        if (disableMouseCounter > 1.0 && UICamera.list[0].useMouse)
-            UICamera.list[0].useMouse = false;
-        if (!UnityXInput.Input.anyKey && !isLockLazyInput)
-            ResetKeyCode();
-        AccelerateKeyNavigation();
-        if (HandleMenuControlKeyPressCustomInput())
-            return;
-        HandleBoosterButton();
-        HandleDialogControlKeyPressCustomInput();
     }
 
     private void AccelerateKeyNavigation()
     {
-        if (!UnityXInput.Input.anyKey && PersistenSingleton<HonoInputManager>.Instance.GetHorizontalNavigation() <= (Double)HonoInputManager.AnalogThreadhold && (PersistenSingleton<HonoInputManager>.Instance.GetHorizontalNavigation() >= -(Double)HonoInputManager.AnalogThreadhold && PersistenSingleton<HonoInputManager>.Instance.GetVerticalNavigation() <= (Double)HonoInputManager.AnalogThreadhold) && PersistenSingleton<HonoInputManager>.Instance.GetVerticalNavigation() >= -(Double)HonoInputManager.AnalogThreadhold)
+        if (!UnityXInput.Input.anyKey &&
+            HonoInputManager.Instance.GetHorizontalNavigation() <= HonoInputManager.AnalogThreadhold &&
+            HonoInputManager.Instance.GetHorizontalNavigation() >= -HonoInputManager.AnalogThreadhold &&
+            HonoInputManager.Instance.GetVerticalNavigation() <= HonoInputManager.AnalogThreadhold &&
+            HonoInputManager.Instance.GetVerticalNavigation() >= -HonoInputManager.AnalogThreadhold)
         {
             if (!firstTimeInput)
                 UICamera.EventWaitTime = 0.175f;
@@ -266,14 +297,53 @@ public class UIKeyTrigger : MonoBehaviour
 
             PersistenSingleton<UIManager>.Instance.Booster.ShowWaringDialog(BoosterType.GilMax);
         }
-        if (Configuration.Mod.TranceSeek && UnityXInput.Input.GetKeyDown(KeyCode.F8) && PersistenSingleton<UIManager>.Instance.IsPause) // TRANCE SEEK - Hard reset, back to main menu
-        {
+        if (Configuration.Control.SoftReset && ((UnityXInput.Input.GetKeyDown(KeyCode.F8) && PersistenSingleton<UIManager>.Instance.IsPause) || SoftResetKeyPSXDown))
+        { // Soft Reset
+            if (ButtonGroupState.ActiveGroup == QuitUI.WarningMenuGroupButton)
+                return;
+
+            if (Configuration.Debug.StartModelViewer)
+            {
+                ModelViewerScene.initialized = false;
+                if (!ModelViewerScene.initialized)
+                    ModelViewerScene.Init();
+                if (ModelViewerScene.initialized)
+                    ModelViewerScene.Update();
+                if (PersistenSingleton<UIManager>.Instance.IsPause)
+                    PersistenSingleton<UIManager>.Instance.GetSceneFromState(PersistenSingleton<UIManager>.Instance.State).OnKeyPause(null);
+                return;
+            }
+
+            Log.Message("[Soft Reset]");
             preventTurboKey = false;
+
+            if (PersistenSingleton<UIManager>.Instance.UnityScene == UIManager.Scene.World && PersistenSingleton<UIManager>.Instance.WorldHUDScene != (UnityEngine.Object)null) // World Map
+            {
+                PersistenSingleton<UIManager>.Instance.WorldHUDScene.MiniMapPanel.SetActive(false);
+                PersistenSingleton<UIManager>.Instance.WorldHUDScene.FullMapPanel.SetActive(false);
+                PersistenSingleton<UIManager>.Instance.WorldHUDScene.MapButtonGameObject.SetActive(false);
+                if (PersistenSingleton<UIManager>.Instance.WorldHUDScene.CurrentState == WorldHUD.State.FullMap)
+                    PersistenSingleton<UIManager>.Instance.WorldHUDScene.OnKeySelect(null);
+                PersistenSingleton<UIManager>.Instance.WorldHUDScene.ClearFullMapLocations();
+                UIManager.Input.ResetKeyCode();
+                EIcon.IsProcessingFIcon = true;
+                PersistenSingleton<EventEngine>.Instance.SetUserControl(true);
+                PersistenSingleton<EventEngine>.Instance.eBin.setVarManually(9173, 0);
+                Singleton<BubbleUI>.Instance.SetGameObjectActive(false);
+                PersistenSingleton<UIManager>.Instance.SetPlayerControlEnable(true, (Action)null);
+                PersistenSingleton<UIManager>.Instance.SetMenuControlEnable(true);
+                ff9.w_naviMode = 0;
+            }
+
             PersistenSingleton<UIManager>.Instance.Dialogs.PauseAllDialog(true);
             PersistenSingleton<UIManager>.Instance.HideAllHUD();
+            Singleton<DialogManager>.Instance.CloseAll();
             ButtonGroupState.DisableAllGroup(true);
             UIManager.Battle.FF9BMenu_EnableMenu(false);
-            PersistenSingleton<UIManager>.Instance.PauseScene.Hide(null);
+            if (PersistenSingleton<UIManager>.Instance.IsPause)
+                PersistenSingleton<UIManager>.Instance.GetSceneFromState(PersistenSingleton<UIManager>.Instance.State).OnKeyPause(null);
+            FF9StateSystem.Battle.FF9Battle.btl_seq = 1; // Prevent the Start button to pause again
+            UIManager.Battle.DisableAutoBattle();
             EventHUD.Cleanup();
             EventInput.ClearPadMask();
             TimerUI.SetEnable(false);
@@ -290,6 +360,11 @@ public class UIKeyTrigger : MonoBehaviour
         }
     }
 
+    [DllImport("user32.dll")]
+    private static extern bool DestroyWindow(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetActiveWindow();
+
     private void OnApplicationQuit()
     {
         if (PersistenSingleton<UIManager>.Instance.UnityScene != UIManager.Scene.Bundle && !quitConfirm)
@@ -300,6 +375,8 @@ public class UIKeyTrigger : MonoBehaviour
         else
         {
             GameLoopManager.RaiseQuitEvent();
+            // DestroyWindow closes faster
+            try { DestroyWindow(GetActiveWindow()); } catch { }
         }
     }
 
@@ -505,7 +582,7 @@ public class UIKeyTrigger : MonoBehaviour
             activeButton = UICamera.selectedObject;
         if (sceneFromState != null && (!PersistenSingleton<UIManager>.Instance.Dialogs.Activate || PersistenSingleton<UIManager>.Instance.IsPause))
         {
-            if (sceneFromState.GetType() == typeof(ConfigUI) && FF9StateSystem.AndroidTVPlatform && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.Pause))
+            if (sceneFromState.GetType() == typeof(ConfigUI) && FF9StateSystem.AndroidTVPlatform && PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.Pause) && !SoftResetKeyPSXForPause)
             {
                 if (PersistenSingleton<UIManager>.Instance.IsPauseControlEnable)
                     sceneFromState.OnKeyPause(activeButton);
@@ -525,22 +602,26 @@ public class UIKeyTrigger : MonoBehaviour
                 sceneFromState.OnKeyConfirm(activeButton);
                 return true;
             }
-            if (battelAutoConfirm && PersistenSingleton<HonoInputManager>.Instance.IsInput(Control.Confirm))
+            if (battelAutoConfirm)
             {
-                // If confirm is held more than 500ms it will auto confirm at an interval of 100ms
-                const Single delay = 0.5f;
-                if (autoConfirmDownTime > 0 && Time.time - autoConfirmDownTime > delay)
+                // The expected chain would be "IsInputDown -> IsInput -> IsInputUp" but it's not always like that (sometimes there is only "IsInputDown", sometimes "IsInput" procs before "IsInputDown"...)
+                if (PersistenSingleton<HonoInputManager>.Instance.IsInput(Control.Confirm))
                 {
-                    autoConfirmDownTime = Time.time - delay + 0.1f;
-                    sceneFromState.OnKeyConfirm(activeButton);
-                    return true;
+                    // If confirm is held more than 500ms it will auto confirm at an interval of 100ms
+                    const Single delay = 0.5f;
+                    if (autoConfirmDownTime > 0 && Time.time - autoConfirmDownTime > delay)
+                    {
+                        autoConfirmDownTime = Time.time - delay + 0.1f;
+                        sceneFromState.OnKeyConfirm(activeButton);
+                        return true;
+                    }
+                }
+                else
+                {
+                    autoConfirmDownTime = 0f;
                 }
             }
-            if (battelAutoConfirm && PersistenSingleton<HonoInputManager>.Instance.IsInputUp(Control.Confirm))
-            {
-                autoConfirmDownTime = 0;
-            }
-            if (PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.Pause) || keyCommand == Control.Pause)
+            if ((PersistenSingleton<HonoInputManager>.Instance.IsInputDown(Control.Pause) || keyCommand == Control.Pause) && !SoftResetKeyPSXForPause)
             {
                 keyCommand = Control.None;
                 if (PersistenSingleton<UIManager>.Instance.IsPauseControlEnable)
@@ -817,14 +898,15 @@ public class UIKeyTrigger : MonoBehaviour
         if (!Configuration.Control.TurboDialog || preventTurboKey)
             return false;
 
-        if(TurboKey || ((HonoInputManager.Instance.IsInput(Control.RightBumper) || ShiftKey) && confirmKeys.Any(HonoInputManager.Instance.IsInput)))
+        if (TurboKey || ((HonoInputManager.Instance.IsInput(Control.RightBumper) || ShiftKey) && confirmKeys.Any(HonoInputManager.Instance.IsInput)))
         {
             if (UIManager.Instance.Dialogs.IsDialogNeedControl())
                 return true;
 
-            if (VoicePlayer.scriptRequestedButtonPress && !BubbleUI.Instance.IsActive && DialogManager.Instance.ActiveDialogList.Any(dial => dial.gameObject.activeInHierarchy && dial.CurrentState == Dialog.State.CompleteAnimation))
+            if (VoicePlayer.scriptRequestedButtonPress && DialogManager.Instance.ActiveDialogList.Any(dial => dial.gameObject.activeInHierarchy && (dial.Style == Dialog.WindowStyle.WindowStyleAuto || dial.Style == Dialog.WindowStyle.WindowStyleTransparent)))
             {
-                EventInput.ReceiveInput(EventInput.Pcircle | EventInput.Lcircle);
+                ETb.sKey &= ~EventInput.GetKeyMaskFromControl(Control.Confirm);
+                EventInput.ReceiveInput(EventInput.GetKeyMaskFromControl(Control.Confirm));
             }
         }
         return false;
@@ -836,6 +918,21 @@ public class UIKeyTrigger : MonoBehaviour
         GameLoopManager.RaiseStartEvent();
         //DebugRectAroundObjectFactory.Run();
     }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto, ExactSpelling = true, CallingConvention = CallingConvention.Winapi)]
+    private static extern Int16 GetKeyState(Int32 keyCode);
+
+    public static Boolean IsKeyLocked(LockKey keyCode)
+    {
+        return (GetKeyState((Int32)keyCode) & 0xFFFF) != 0;
+    }
+
+    public enum LockKey
+    {
+        Caps = 0x14,
+        Num = 0x90,
+        Scroll = 0x91
+    }
 }
 
 
@@ -843,7 +940,7 @@ namespace Memoria
 {
     public static class UISceneHelper
     {
-        public static void OpenPartyMenu()
+        public static FF9PARTY_INFO GetCurrentPartyForMenu()
         {
             FF9PARTY_INFO party = new FF9PARTY_INFO();
             List<CharacterId> selectList = new List<CharacterId>();
@@ -852,6 +949,7 @@ namespace Memoria
                 if (p.info.party != 0)
                     selectList.Add(p.info.slot_no);
             party.party_ct = Math.Min(4, selectList.Count);
+            party.exact_party_ct = -1;
 
             for (Int32 memberIndex = 0; memberIndex < 4; ++memberIndex)
             {
@@ -866,9 +964,19 @@ namespace Memoria
                     party.menu[memberIndex] = CharacterId.NONE;
                 }
             }
-
             party.select = selectList.ToArray();
-            EventService.OpenPartyMenu(party);
+
+            if (PersistenSingleton<UIManager>.Instance.UnityScene == UIManager.Scene.Battle)
+            {
+                party.exact_party_ct = FF9StateSystem.Common.FF9.party.MemberCount;
+                party.fix = UIManager.Battle.GetNonSwappableCharacters();
+            }
+            return party;
+        }
+
+        public static void OpenPartyMenu()
+        {
+            EventService.OpenPartyMenu(GetCurrentPartyForMenu());
         }
     }
 }

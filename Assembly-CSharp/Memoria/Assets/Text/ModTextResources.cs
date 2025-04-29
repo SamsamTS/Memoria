@@ -1,6 +1,6 @@
-﻿using System;
+﻿using Memoria.Prime;
+using System;
 using System.Text;
-using Memoria.Prime;
 
 namespace Memoria.Assets
 {
@@ -69,7 +69,7 @@ namespace Memoria.Assets
                 String currentPath = GetCurrentPath(relativeReference.Value);
                 return new TextResourcePath(new TextResourceReference(currentPath), Configuration.Export.TextFileFormat);
             }
-            
+
             public static String GetCurrentPath(String relativePath)
             {
                 StringBuilder sb = new(64);
@@ -77,7 +77,7 @@ namespace Memoria.Assets
                 if (sb.Length > 0 && sb[sb.Length - 1] != '/' && sb[sb.Length - 1] != '\\')
                     sb.Append('/');
                 sb.Append("Text/");
-                sb.Append(CurrentSymbol ?? Localization.GetSymbol());
+                sb.Append(CurrentSymbol ?? Localization.CurrentSymbol);
                 sb.Append(relativePath);
                 return sb.ToString();
             }
@@ -117,10 +117,10 @@ namespace Memoria.Assets
                 String currentPath = GetCurrentPath(relativeReference.Value);
                 return new TextResourceReference(currentPath);
             }
-            
+
             public static String GetCurrentPath(String relativePath)
             {
-                return GetSymbolPath(Localization.GetSymbol(), relativePath);
+                return GetSymbolPath(Localization.CurrentSymbol, relativePath);
             }
 
             public static TextResourceReference GetSymbolPath(String symbol, TextResourceReference relativeReference)

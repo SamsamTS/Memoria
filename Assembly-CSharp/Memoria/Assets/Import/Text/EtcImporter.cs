@@ -1,6 +1,6 @@
+using Assets.Sources.Scripts.UI.Common;
 using System;
 using System.Collections.Generic;
-using Assets.Sources.Scripts.UI.Common;
 
 namespace Memoria.Assets
 {
@@ -9,7 +9,7 @@ namespace Memoria.Assets
         protected override String TypeName { get; }
         protected override TextResourceReference ImportPath { get; }
 
-        private readonly Action<String[]> _setter;
+        private readonly Action<Int32, String> _setter;
         private readonly String _embadedPath;
 
         public static IEnumerable<EtcImporter> EnumerateImporters()
@@ -68,7 +68,7 @@ namespace Memoria.Assets
         {
             String[] strings = EmbadedSentenseLoader.LoadSentense(_embadedPath);
 
-            _setter(strings);
+            FF9TextTool.ImportArrayToDictionary(strings, _setter);
             return true;
         }
 
@@ -77,7 +77,7 @@ namespace Memoria.Assets
             String[] strings;
             EtcFormatter.Parse(entreis, out strings);
 
-            _setter(strings);
+            FF9TextTool.ImportArrayToDictionary(strings, _setter);
         }
     }
 }

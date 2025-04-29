@@ -1,16 +1,13 @@
-﻿using System;
-using Assets.Scripts.Common;
+﻿using Assets.Scripts.Common;
 using Assets.Sources.Scripts.UI.Common;
-using FF9;
+using Memoria;
+using Memoria.Assets;
+using Memoria.Data;
+using Memoria.Scenes;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using Memoria;
-using Memoria.Assets;
-using Memoria.Scenes;
-using Memoria.Data;
-using Memoria.Field;
-using Memoria.Prime;
 using UnityEngine;
 
 // ReSharper disable UnusedMember.Global
@@ -26,12 +23,13 @@ using UnityEngine;
 
 public class ItemUI : UIScene
 {
-    public static String SubMenuGroupButton;
-    public static String ItemGroupButton;
-    public static String KeyItemGroupButton;
-    public static String TargetGroupButton;
-    public static String ArrangeMenuGroupButton;
-    public static String ItemArrangeGroupButton;
+    public const String SubMenuGroupButton = "Item.SubMenu";
+    public const String ItemGroupButton = "Item.Item";
+    public const String KeyItemGroupButton = "Item.KeyItem";
+    public const String TargetGroupButton = "Item.Target";
+    public const String ArrangeMenuGroupButton = "Item.ArrangeMenu";
+    public const String ItemArrangeGroupButton = "Item.Arrange";
+
     public GameObject TransitionGroup;
     public GameObject UseSubMenu;
     public GameObject ArrangeSubMenu;
@@ -43,14 +41,13 @@ public class ItemUI : UIScene
     public GameObject KeyItemDetailPanel;
     public GameObject ArrangeDialog;
     public GameObject ScreenFadeGameObject;
-    private static Int32 FF9FITEM_RARE_MAX;
-    private static Int32 FF9FITEM_RARE_NONE;
-    private static Int32 FF9FITEM_CHOCOBO_NONE;
-    private static Int32 FF9FITEM_ID_VEGETABLE;
-    private static Int32 FF9FITEM_EVENT_VEGETABLE;
-    private static Int32 FF9FITEM_EVENT_KIND_CHOCOBO;
-    private static Int32 MaxItemSlot;
-    private static Single TargetPositionXOffset;
+
+    private const Int32 FF9FITEM_RARE_NONE = Byte.MaxValue;
+    private const Int32 FF9FITEM_CHOCOBO_NONE = 0;
+    private const Int32 FF9FITEM_EVENT_VEGETABLE = 181;
+    private const Int32 FF9FITEM_EVENT_KIND_CHOCOBO = 191;
+    private const Single TargetPositionXOffset = 338f;
+
     private readonly List<RegularItem> _itemIdList;
     private readonly List<RegularItem> _usedItemIdList;
     //private List<Int32> _ketIdList;
@@ -75,22 +72,15 @@ public class ItemUI : UIScene
     private Int32 _defaultSkinLabelSpacingY;
     private GOScrollablePanel _itemPanel;
     private GOScrollablePanel _keyItemPanel;
+    [NonSerialized]
+    private ArrangeDialogHUD _arrangeDialog;
+    [NonSerialized]
+    private GOMenuBackground _background;
 
-    static ItemUI()
-    {
-        SubMenuGroupButton = "Item.SubMenu";
-        ItemGroupButton = "Item.Item";
-        KeyItemGroupButton = "Item.KeyItem";
-        TargetGroupButton = "Item.Target";
-        ArrangeMenuGroupButton = "Item.ArrangeMenu";
-        ItemArrangeGroupButton = "Item.Arrange";
-        FF9FITEM_RARE_MAX = 80;
-        FF9FITEM_RARE_NONE = Byte.MaxValue;
-        FF9FITEM_EVENT_VEGETABLE = 181;
-        FF9FITEM_EVENT_KIND_CHOCOBO = 191;
-        MaxItemSlot = 256;
-        TargetPositionXOffset = 338f;
-    }
+    [NonSerialized]
+    private Boolean _multiTarget;
+    [NonSerialized]
+    private Boolean _canMultiTarget;
 
     public ItemUI()
     {
@@ -110,7 +100,7 @@ public class ItemUI : UIScene
             ButtonGroupState.SetPointerDepthToGroup(7, TargetGroupButton);
             ButtonGroupState.SetPointerOffsetToGroup(new Vector2(54f, 0.0f), ItemGroupButton);
             ButtonGroupState.SetPointerOffsetToGroup(new Vector2(54f, 0.0f), KeyItemGroupButton);
-            ButtonGroupState.SetPointerOffsetToGroup(new Vector2(160f, 10f), ArrangeMenuGroupButton);
+            ButtonGroupState.SetPointerOffsetToGroup(new Vector2(-20f, 10f), ArrangeMenuGroupButton);
             ButtonGroupState.SetPointerOffsetToGroup(new Vector2(48f, -6f), ItemArrangeGroupButton);
             ButtonGroupState.SetScrollButtonToGroup(_itemScrollList.ScrollButton, ItemGroupButton);
             ButtonGroupState.SetScrollButtonToGroup(_itemScrollList.ScrollButton, ItemArrangeGroupButton);
@@ -123,6 +113,7 @@ public class ItemUI : UIScene
             afterFinished?.Invoke();
         };
 
+        _fastSwitch = false;
         SceneDirector.FadeEventSetColor(FadeMode.Sub, Color.black);
         base.Show(afterShowAction);
         UpdateUserInterface();
@@ -190,7 +181,7 @@ public class ItemUI : UIScene
         //keyItemPrefab.NewIcon.SetAnchor(target: _keyItemPanel.SubPanel.ButtonPrefab.Transform, relBottom: 0.184f, relTop: 0.816f, relLeft: 0.75f, relRight: 0.9f);
         keyItemPrefab.NewIcon.SetDimensions((Int32)Math.Round(117f * scaleFactor), (Int32)Math.Round(64f * scaleFactor));
         keyItemPrefab.NewIconSprite.SetDimensions((Int32)Math.Round(44f * scaleFactor), (Int32)Math.Round(58f * scaleFactor));
-        keyItemPrefab.NewIconLabelSprite.SetDimensions((Int32)Math.Round(90f * scaleFactor), (Int32)Math.Round(58f * scaleFactor));
+        keyItemPrefab.NewIconLabelSprite.SetAnchor(keyItemPrefab.NewIconSprite.transform, 0.6f, 0f, 0.6f, 0f, 0, 0, 90f * scaleFactor, 58f * scaleFactor);
         keyItemPrefab.NameLabel.fontSize = (Int32)Math.Round(36f * scaleFactor);
         keyItemPrefab.NameLabel.effectDistance = new Vector2((Int32)Math.Round(4f * scaleFactor), (Int32)Math.Round(4f * scaleFactor));
         _keyItemPanel.SubPanel.RecycleListPopulator.RefreshTableView();
@@ -234,133 +225,109 @@ public class ItemUI : UIScene
         ButtonGroupState.RemoveCursorMemorize(KeyItemGroupButton);
     }
 
+    public void OnLocalize()
+    {
+        if (!isActiveAndEnabled)
+            return;
+        if (_itemScrollList.isActiveAndEnabled)
+            _itemScrollList.UpdateTableViewImp();
+        if (_keyItemScrollList.isActiveAndEnabled)
+            _keyItemScrollList.UpdateTableViewImp();
+        if (_isShowingKeyItemDesp)
+        {
+            Int32 keyItemId = _keyItemIdList[_currentItemIndex];
+            _keyItemDetailName.rawText = FF9TextTool.ImportantItemName(keyItemId);
+            _keyItemDetailDescription.spacingY = _defaultSkinLabelSpacingY;
+            _keyItemDetailDescription.rawText = FF9TextTool.ImportantItemSkin(keyItemId);
+        }
+    }
+
     public override Boolean OnKeyConfirm(GameObject go)
     {
-        if (base.OnKeyConfirm(go))
+        if (!base.OnKeyConfirm(go))
+            return true;
+        if (_isShowingKeyItemDesp)
         {
-            if (_isShowingKeyItemDesp)
+            FF9Sfx.FF9SFX_Play(103);
+            DisplayKeyItemSkin(false);
+        }
+        if (ButtonGroupState.ActiveGroup == SubMenuGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(103);
+            _currentMenu = GetSubMenuFromGameObject(go);
+            switch (_currentMenu)
             {
-                FF9Sfx.FF9SFX_Play(103);
-                DisplayKeyItemSkin(false);
-            }
-            if (ButtonGroupState.ActiveGroup == SubMenuGroupButton)
-            {
-                FF9Sfx.FF9SFX_Play(103);
-                _currentMenu = GetSubMenuFromGameObject(go);
-                switch (_currentMenu)
-                {
-                    case SubMenu.Use:
-                        _currentArrangeMode = 0;
-                        ButtonGroupState.ActiveGroup = ItemGroupButton;
-                        ButtonGroupState.SetSecondaryOnGroup(SubMenuGroupButton);
-                        ButtonGroupState.HoldActiveStateOnGroup(SubMenuGroupButton);
-                        break;
-                    case SubMenu.Arrange:
-                        _arrangeTransition.TweenIn(() =>
-                        {
-                            Loading = false;
-                            ButtonGroupState.ActiveGroup = ArrangeMenuGroupButton;
-                            ButtonGroupState.HoldActiveStateOnGroup(SubMenuGroupButton);
-                        });
-                        Loading = true;
-                        break;
-                    case SubMenu.Key:
-                        if (_keyItemIdList.Count > 0)
-                        {
-                            ButtonGroupState.ActiveGroup = KeyItemGroupButton;
-                            ButtonGroupState.SetSecondaryOnGroup(SubMenuGroupButton);
-                            ButtonGroupState.HoldActiveStateOnGroup(SubMenuGroupButton);
-                        }
-                        break;
-                }
-            }
-            else if (ButtonGroupState.ActiveGroup == ArrangeMenuGroupButton)
-            {
-                FF9Sfx.FF9SFX_Play(103);
-                _currentArrangeMode = go.transform.GetSiblingIndex() + 1;
-                switch (_currentArrangeMode)
-                {
-                    case 1:
-                        _arrangeTransition.TweenOut(() => Loading = false);
-                        Loading = true;
-                        ButtonGroupState.ActiveGroup = SubMenuGroupButton;
-                        ArrangeAuto();
-                        DisplayItem();
-                        break;
-                    case 2:
-                        _arrangeTransition.TweenOut(() => Loading = false);
-                        Loading = true;
-                        ButtonGroupState.ActiveGroup = ItemGroupButton;
-                        ButtonGroupState.SetSecondaryOnGroup(SubMenuGroupButton);
-                        ButtonGroupState.HoldActiveStateOnGroup(SubMenuGroupButton);
-                        DisplayItem();
-                        break;
-                }
-            }
-            else if (ButtonGroupState.ActiveGroup == ItemGroupButton)
-            {
-                if (ButtonGroupState.ContainButtonInGroup(go, ItemGroupButton))
-                {
-                    _currentItemIndex = go.GetComponent<RecycleListItem>().ItemDataIndex;
-                    if (_currentArrangeMode == 0)
+                case SubMenu.Use:
+                    _currentArrangeMode = 0;
+                    ButtonGroupState.ActiveGroup = ItemGroupButton;
+                    ButtonGroupState.SetSecondaryOnGroup(SubMenuGroupButton);
+                    ButtonGroupState.HoldActiveStateOnGroup(SubMenuGroupButton);
+                    break;
+                case SubMenu.Arrange:
+                    _arrangeTransition.TweenIn(() =>
                     {
-                        PLAYER player = FF9StateSystem.Common.FF9.party.member[0];
-                        RegularItem itemId = _itemIdList[_currentItemIndex];
-                        FF9ITEM_DATA itemData = ff9item._FF9Item_Data[itemId];
-                        if (ff9item.HasItemEffect(itemId))
+                        Loading = false;
+                        ButtonGroupState.ActiveGroup = ArrangeMenuGroupButton;
+                        ButtonGroupState.HoldActiveStateOnGroup(SubMenuGroupButton);
+                        _arrangeDialog.Background.Caption.Label.Parser.ResetBeforeVariableTags();
+                    });
+                    Loading = true;
+                    break;
+                case SubMenu.Key:
+                    if (_keyItemIdList.Count > 0)
+                    {
+                        ButtonGroupState.ActiveGroup = KeyItemGroupButton;
+                        ButtonGroupState.SetSecondaryOnGroup(SubMenuGroupButton);
+                        ButtonGroupState.HoldActiveStateOnGroup(SubMenuGroupButton);
+                    }
+                    break;
+            }
+        }
+        else if (ButtonGroupState.ActiveGroup == ArrangeMenuGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(103);
+            _currentArrangeMode = go.transform.GetSiblingIndex() + 1;
+            switch (_currentArrangeMode)
+            {
+                case 1:
+                    _arrangeTransition.TweenOut(() => Loading = false);
+                    Loading = true;
+                    ButtonGroupState.ActiveGroup = SubMenuGroupButton;
+                    ArrangeAuto();
+                    DisplayItem();
+                    break;
+                case 2:
+                    _arrangeTransition.TweenOut(() => Loading = false);
+                    Loading = true;
+                    ButtonGroupState.ActiveGroup = ItemGroupButton;
+                    ButtonGroupState.SetSecondaryOnGroup(SubMenuGroupButton);
+                    ButtonGroupState.HoldActiveStateOnGroup(SubMenuGroupButton);
+                    DisplayItem();
+                    break;
+            }
+        }
+        else if (ButtonGroupState.ActiveGroup == ItemGroupButton)
+        {
+            if (ButtonGroupState.ContainButtonInGroup(go, ItemGroupButton))
+            {
+                _currentItemIndex = go.GetComponent<RecycleListItem>().ItemDataIndex;
+                if (_currentArrangeMode == 0)
+                {
+                    PLAYER player = FF9StateSystem.Common.FF9.party.member[0];
+                    RegularItem itemId = _itemIdList[_currentItemIndex];
+                    FF9ITEM_DATA itemData = ff9item._FF9Item_Data[itemId];
+                    if (ff9item.HasItemEffect(itemId) && (itemData.type & ItemType.Usable) != 0 && !_usedItemIdList.Contains(itemId))
+                    {
+                        if (itemId == RegularItem.GysahlGreens)
                         {
-                            ITEM_DATA itemEffect = ff9item.GetItemEffect(itemId);
-                            if ((itemData.type & ItemType.Usable) != 0)
+                            if (PersistenSingleton<UIManager>.Instance.ItemScene.FF9FItem_Vegetable())
                             {
-                                if (!_usedItemIdList.Contains(itemId))
-                                {
-                                    if ((itemId != RegularItem.GysahlGreens ? itemEffect.info.DisplayStats : 0) == 0)
-                                    {
-                                        if (SFieldCalculator.FieldCalcMain(player, player, itemEffect, itemEffect.Ref.ScriptId, 0U))
-                                        {
-                                            PersistenSingleton<UIManager>.Instance.MainMenuScene.ImpactfulActionCount++;
-                                            FF9Sfx.FF9SFX_Play(106);
-                                            ff9item.FF9Item_Remove(itemId, 1);
-                                            if (ff9item.FF9Item_GetCount(itemId) == 0)
-                                                _usedItemIdList.Add(itemId);
-                                            DisplayItem();
-                                        }
-                                        else
-                                        {
-                                            FF9Sfx.FF9SFX_Play(102);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        FF9Sfx.FF9SFX_Play(103);
-                                        if (_currentItemIndex % 2 == 0)
-                                        {
-                                            _targetTransition.animatedInStartPosition = new Vector3(1543f, 0.0f, 0.0f);
-                                            _targetTransition.animatedOutEndPosition = new Vector3(1543f, 0.0f, 0.0f);
-                                            TargetListPanel.transform.localPosition = new Vector3(TargetPositionXOffset, 0.0f, 0.0f);
-                                        }
-                                        else
-                                        {
-                                            _targetTransition.animatedInStartPosition = new Vector3(-1543f, 0.0f, 0.0f);
-                                            _targetTransition.animatedOutEndPosition = new Vector3(-1543f, 0.0f, 0.0f);
-                                            TargetListPanel.transform.localPosition = new Vector3((Single)(-TargetPositionXOffset - 60.0), 0.0f, 0.0f);
-                                        }
-                                        _targetTransition.DestinationPosition = new Vector3[1] { TargetListPanel.transform.localPosition };
-                                        DisplayTarget();
-                                        Loading = true;
-                                        _targetTransition.TweenIn(new Byte[1], () =>
-                                        {
-                                            Loading = false;
-                                            ButtonGroupState.RemoveCursorMemorize(TargetGroupButton);
-                                            ButtonGroupState.ActiveGroup = TargetGroupButton;
-                                            ButtonGroupState.HoldActiveStateOnGroup(ItemGroupButton);
-                                        });
-                                    }
-                                }
-                                else
-                                {
-                                    FF9Sfx.FF9SFX_Play(102);
-                                }
+                                PersistenSingleton<UIManager>.Instance.MainMenuScene.ImpactfulActionCount++;
+                                FF9Sfx.FF9SFX_Play(106);
+                                ff9item.FF9Item_Remove(itemId, 1);
+                                if (ff9item.FF9Item_GetCount(itemId) == 0)
+                                    _usedItemIdList.Add(itemId);
+                                DisplayItem();
                             }
                             else
                             {
@@ -369,69 +336,32 @@ public class ItemUI : UIScene
                         }
                         else
                         {
-                            FF9Sfx.FF9SFX_Play(102);
-                        }
-                    }
-                    else if (_currentArrangeMode == 2)
-                    {
-                        FF9Sfx.FF9SFX_Play(103);
-                        ButtonGroupState.SetCursorMemorize(go.GetChild(1), ItemArrangeGroupButton);
-                        ButtonGroupState.ActiveGroup = ItemArrangeGroupButton;
-                        ButtonGroupState.HoldActiveStateOnGroup(ItemGroupButton);
-                        ButtonGroupState.SetOutsideLimitRectBehavior(PointerManager.LimitRectBehavior.Hide, ItemGroupButton);
-                    }
-                }
-                else
-                {
-                    OnSecondaryGroupClick(go);
-                }
-            }
-            else if (ButtonGroupState.ActiveGroup == KeyItemGroupButton)
-            {
-                if (ButtonGroupState.ContainButtonInGroup(go, KeyItemGroupButton))
-                {
-                    _currentItemIndex = go.GetComponent<RecycleListItem>().ItemDataIndex;
-                    if (_keyItemIdList[_currentItemIndex] != FF9FITEM_RARE_NONE)
-                    {
-                        FF9Sfx.FF9SFX_Play(103);
-                        DisplayKeyItemSkin(true);
-                    }
-                    else
-                    {
-                        FF9Sfx.FF9SFX_Play(102);
-                    }
-                }
-                else
-                {
-                    OnSecondaryGroupClick(go);
-                }
-            }
-            else if (ButtonGroupState.ActiveGroup == TargetGroupButton)
-            {
-                if (ButtonGroupState.ContainButtonInGroup(go, TargetGroupButton))
-                {
-                    Int32 siblingIndex = go.transform.GetSiblingIndex();
-                    RegularItem itemId = _itemIdList[_currentItemIndex];
-                    PLAYER player = FF9StateSystem.Common.FF9.party.member[siblingIndex];
-                    ITEM_DATA tbl = ff9item.GetItemEffect(itemId);
-                    if (SFieldCalculator.FieldCalcMain(player, player, tbl, tbl.Ref.ScriptId, 0U))
-                    {
-                        PersistenSingleton<UIManager>.Instance.MainMenuScene.ImpactfulActionCount++;
-                        FF9Sfx.FF9SFX_Play(106);
-                        ff9item.FF9Item_Remove(itemId, 1);
-                        if (ff9item.FF9Item_GetCount(itemId) > 0)
-                        {
-                            DisplayItem();
+                            FF9Sfx.FF9SFX_Play(103);
+                            TargetType targetType = ff9item.GetItemEffect(itemId).info.Target;
+                            this._canMultiTarget = this.CanToggleMulti(targetType);
+                            if (_currentItemIndex % 2 == 0)
+                            {
+                                _targetTransition.animatedInStartPosition = new Vector3(1543f, 0.0f, 0.0f);
+                                _targetTransition.animatedOutEndPosition = new Vector3(1543f, 0.0f, 0.0f);
+                                TargetListPanel.transform.localPosition = new Vector3(TargetPositionXOffset, 0.0f, 0.0f);
+                            }
+                            else
+                            {
+                                _targetTransition.animatedInStartPosition = new Vector3(-1543f, 0.0f, 0.0f);
+                                _targetTransition.animatedOutEndPosition = new Vector3(-1543f, 0.0f, 0.0f);
+                                TargetListPanel.transform.localPosition = new Vector3(-TargetPositionXOffset - 60f, 0.0f, 0.0f);
+                            }
+                            _targetTransition.DestinationPosition = [TargetListPanel.transform.localPosition];
                             DisplayTarget();
-                        }
-                        else
-                        {
-                            _usedItemIdList.Add(itemId);
-                            DisplayItem();
-                            ButtonGroupState.ActiveGroup = ItemGroupButton;
                             Loading = true;
-                            // ISSUE: method pointer
-                            _targetTransition.TweenOut(new Byte[1], () => Loading = false);
+                            _targetTransition.TweenIn([0], () =>
+                            {
+                                Loading = false;
+                                ButtonGroupState.RemoveCursorMemorize(TargetGroupButton);
+                                ButtonGroupState.ActiveGroup = TargetGroupButton;
+                                ButtonGroupState.HoldActiveStateOnGroup(ItemGroupButton);
+                                this.SetMultipleTarget(targetType == TargetType.All || targetType == TargetType.AllAlly || targetType == TargetType.AllEnemy || targetType == TargetType.Everyone);
+                            });
                         }
                     }
                     else
@@ -439,28 +369,107 @@ public class ItemUI : UIScene
                         FF9Sfx.FF9SFX_Play(102);
                     }
                 }
-            }
-            else if (ButtonGroupState.ActiveGroup == ItemArrangeGroupButton)
-            {
-                if (ButtonGroupState.ContainButtonInGroup(go, ItemArrangeGroupButton))
+                else if (_currentArrangeMode == 2)
                 {
                     FF9Sfx.FF9SFX_Play(103);
-                    _currentArrangeItemIndex = go.transform.parent.GetComponent<RecycleListItem>().ItemDataIndex;
-                    FF9ITEM ff9Item = FF9StateSystem.Common.FF9.item[_currentItemIndex];
-                    FF9StateSystem.Common.FF9.item[_currentItemIndex] = FF9StateSystem.Common.FF9.item[_currentArrangeItemIndex];
-                    FF9StateSystem.Common.FF9.item[_currentArrangeItemIndex] = ff9Item;
-                    _switchingItem = true;
-                    DisplayItem();
-                    _itemScrollList.JumpToIndex(_currentArrangeItemIndex, false);
-                    ButtonGroupState.RemoveCursorMemorize(ItemGroupButton);
-                    ButtonGroupState.ActiveGroup = ItemGroupButton;
-                    ButtonGroupState.SetOutsideLimitRectBehavior(PointerManager.LimitRectBehavior.Limit, ItemGroupButton);
-                    _switchingItem = false;
+                    ButtonGroupState.SetCursorMemorize(go.GetChild(1), ItemArrangeGroupButton);
+                    ButtonGroupState.ActiveGroup = ItemArrangeGroupButton;
+                    ButtonGroupState.HoldActiveStateOnGroup(ItemGroupButton);
+                    ButtonGroupState.SetOutsideLimitRectBehavior(PointerManager.LimitRectBehavior.Hide, ItemGroupButton);
+                }
+            }
+            else
+            {
+                OnSecondaryGroupClick(go);
+            }
+        }
+        else if (ButtonGroupState.ActiveGroup == KeyItemGroupButton)
+        {
+            if (ButtonGroupState.ContainButtonInGroup(go, KeyItemGroupButton))
+            {
+                _currentItemIndex = go.GetComponent<RecycleListItem>().ItemDataIndex;
+                if (_keyItemIdList[_currentItemIndex] != FF9FITEM_RARE_NONE)
+                {
+                    FF9Sfx.FF9SFX_Play(103);
+                    DisplayKeyItemSkin(true);
                 }
                 else
                 {
-                    OnSecondaryGroupClick(go);
+                    FF9Sfx.FF9SFX_Play(102);
                 }
+            }
+            else
+            {
+                OnSecondaryGroupClick(go);
+            }
+        }
+        else if (ButtonGroupState.ActiveGroup == TargetGroupButton)
+        {
+            if (ButtonGroupState.ContainButtonInGroup(go, TargetGroupButton))
+            {
+                Int32 siblingIndex = go.transform.GetSiblingIndex();
+                RegularItem itemId = _itemIdList[_currentItemIndex];
+                Boolean canUseAbility = false;
+                if (!this._multiTarget)
+                {
+                    PLAYER player = FF9StateSystem.Common.FF9.party.member[siblingIndex];
+                    canUseAbility = SFieldCalculator.FieldCalcMain(player, player, itemId, 0u);
+                }
+                else
+                {
+                    for (Int32 i = 0; i < 4; ++i)
+                    {
+                        PLAYER player = FF9StateSystem.Common.FF9.party.member[i];
+                        if (player != null)
+                            canUseAbility |= SFieldCalculator.FieldCalcMain(player, player, itemId, 1u);
+                    }
+                }
+                if (canUseAbility)
+                {
+                    PersistenSingleton<UIManager>.Instance.MainMenuScene.ImpactfulActionCount++;
+                    FF9Sfx.FF9SFX_Play(106);
+                    ff9item.FF9Item_Remove(itemId, 1);
+                    if (ff9item.FF9Item_GetCount(itemId) > 0)
+                    {
+                        DisplayItem();
+                        DisplayTarget();
+                    }
+                    else
+                    {
+                        _usedItemIdList.Add(itemId);
+                        DisplayItem();
+                        ButtonGroupState.ActiveGroup = ItemGroupButton;
+                        Loading = true;
+                        // ISSUE: method pointer
+                        _targetTransition.TweenOut(new Byte[1], () => Loading = false);
+                    }
+                }
+                else
+                {
+                    FF9Sfx.FF9SFX_Play(102);
+                }
+            }
+        }
+        else if (ButtonGroupState.ActiveGroup == ItemArrangeGroupButton)
+        {
+            if (ButtonGroupState.ContainButtonInGroup(go, ItemArrangeGroupButton))
+            {
+                FF9Sfx.FF9SFX_Play(103);
+                _currentArrangeItemIndex = go.transform.parent.GetComponent<RecycleListItem>().ItemDataIndex;
+                FF9ITEM ff9Item = FF9StateSystem.Common.FF9.item[_currentItemIndex];
+                FF9StateSystem.Common.FF9.item[_currentItemIndex] = FF9StateSystem.Common.FF9.item[_currentArrangeItemIndex];
+                FF9StateSystem.Common.FF9.item[_currentArrangeItemIndex] = ff9Item;
+                _switchingItem = true;
+                DisplayItem();
+                _itemScrollList.JumpToIndex(_currentArrangeItemIndex, false);
+                ButtonGroupState.RemoveCursorMemorize(ItemGroupButton);
+                ButtonGroupState.ActiveGroup = ItemGroupButton;
+                ButtonGroupState.SetOutsideLimitRectBehavior(PointerManager.LimitRectBehavior.Limit, ItemGroupButton);
+                _switchingItem = false;
+            }
+            else
+            {
+                OnSecondaryGroupClick(go);
             }
         }
         return true;
@@ -468,125 +477,140 @@ public class ItemUI : UIScene
 
     public override Boolean OnKeyCancel(GameObject go)
     {
-        if (base.OnKeyCancel(go))
+        if (!base.OnKeyCancel(go))
+            return true;
+        if (_isShowingKeyItemDesp)
         {
-            if (_isShowingKeyItemDesp)
+            FF9Sfx.FF9SFX_Play(101);
+            DisplayKeyItemSkin(false);
+        }
+        if (ButtonGroupState.ActiveGroup == SubMenuGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(101);
+            _fastSwitch = false;
+            Hide(() =>
             {
-                FF9Sfx.FF9SFX_Play(101);
-                DisplayKeyItemSkin(false);
-            }
-            if (ButtonGroupState.ActiveGroup == SubMenuGroupButton)
-            {
-                FF9Sfx.FF9SFX_Play(101);
-                _fastSwitch = false;
-                Hide(() =>
-                {
-                    PersistenSingleton<UIManager>.Instance.MainMenuScene.NeedTweenAndHideSubMenu = false;
-                    PersistenSingleton<UIManager>.Instance.MainMenuScene.CurrentSubMenu = MainMenuUI.SubMenu.Item;
-                    PersistenSingleton<UIManager>.Instance.ChangeUIState(UIManager.UIState.MainMenu);
-                });
-            }
-            else if (ButtonGroupState.ActiveGroup == ArrangeMenuGroupButton)
-            {
-                FF9Sfx.FF9SFX_Play(101);
-                _currentArrangeMode = 0;
-                // ISSUE: method pointer
-                _arrangeTransition.TweenOut(() => Loading = false);
-                Loading = true;
-                ButtonGroupState.ActiveGroup = SubMenuGroupButton;
-            }
-            else if (ButtonGroupState.ActiveGroup == ItemGroupButton)
-            {
-                FF9Sfx.FF9SFX_Play(101);
-                ButtonGroupState.ActiveGroup = SubMenuGroupButton;
-            }
-            else if (ButtonGroupState.ActiveGroup == KeyItemGroupButton)
-            {
-                FF9Sfx.FF9SFX_Play(101);
-                ButtonGroupState.ActiveGroup = SubMenuGroupButton;
-            }
-            else if (ButtonGroupState.ActiveGroup == TargetGroupButton)
-            {
-                FF9Sfx.FF9SFX_Play(101);
-                ButtonGroupState.ActiveGroup = ItemGroupButton;
-                Loading = true;
-                // ISSUE: method pointer
-                _targetTransition.TweenOut(new Byte[1], () => Loading = false);
-            }
-            else if (ButtonGroupState.ActiveGroup == ItemArrangeGroupButton)
-            {
-                FF9Sfx.FF9SFX_Play(101);
-                Int32 itemDataIndex = go.transform.parent.GetComponent<RecycleListItem>().ItemDataIndex;
-                _switchingItem = true;
-                _currentItemIndex = itemDataIndex;
-                _itemScrollList.JumpToIndex(_currentItemIndex, false);
-                ButtonGroupState.RemoveCursorMemorize(ItemGroupButton);
-                ButtonGroupState.ActiveGroup = ItemGroupButton;
-                ButtonGroupState.SetOutsideLimitRectBehavior(PointerManager.LimitRectBehavior.Limit, ItemGroupButton);
-                _switchingItem = false;
-            }
+                PersistenSingleton<UIManager>.Instance.MainMenuScene.NeedTweenAndHideSubMenu = false;
+                PersistenSingleton<UIManager>.Instance.MainMenuScene.CurrentSubMenu = MainMenuUI.SubMenu.Item;
+                PersistenSingleton<UIManager>.Instance.ChangeUIState(UIManager.UIState.MainMenu);
+            });
+        }
+        else if (ButtonGroupState.ActiveGroup == ArrangeMenuGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(101);
+            _currentArrangeMode = 0;
+            // ISSUE: method pointer
+            _arrangeTransition.TweenOut(() => Loading = false);
+            Loading = true;
+            ButtonGroupState.ActiveGroup = SubMenuGroupButton;
+        }
+        else if (ButtonGroupState.ActiveGroup == ItemGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(101);
+            ButtonGroupState.ActiveGroup = SubMenuGroupButton;
+        }
+        else if (ButtonGroupState.ActiveGroup == KeyItemGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(101);
+            ButtonGroupState.ActiveGroup = SubMenuGroupButton;
+        }
+        else if (ButtonGroupState.ActiveGroup == TargetGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(101);
+            this.SetMultipleTarget(false);
+            ButtonGroupState.ActiveGroup = ItemGroupButton;
+            Loading = true;
+            // ISSUE: method pointer
+            _targetTransition.TweenOut(new Byte[1], () => Loading = false);
+        }
+        else if (ButtonGroupState.ActiveGroup == ItemArrangeGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(101);
+            Int32 itemDataIndex = go.transform.parent.GetComponent<RecycleListItem>().ItemDataIndex;
+            _switchingItem = true;
+            _currentItemIndex = itemDataIndex;
+            _itemScrollList.JumpToIndex(_currentItemIndex, false);
+            ButtonGroupState.RemoveCursorMemorize(ItemGroupButton);
+            ButtonGroupState.ActiveGroup = ItemGroupButton;
+            ButtonGroupState.SetOutsideLimitRectBehavior(PointerManager.LimitRectBehavior.Limit, ItemGroupButton);
+            _switchingItem = false;
         }
         return true;
     }
 
     public override Boolean OnKeyLeftBumper(GameObject go)
     {
-        base.OnKeyLeftBumper(go);
+        if (!base.OnKeyLeftBumper(go))
+            return true;
         if (ButtonGroupState.ActiveGroup == ItemArrangeGroupButton)
+        {
             _itemScrollList.ActiveNumber = _currentItemIndex;
+        }
+        else if (ButtonGroupState.ActiveGroup == TargetGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(103);
+            this.ToggleMultipleTarget();
+        }
         return true;
     }
 
     public override Boolean OnKeyRightBumper(GameObject go)
     {
-        base.OnKeyRightBumper(go);
+        if (!base.OnKeyRightBumper(go))
+            return true;
         if (ButtonGroupState.ActiveGroup == ItemArrangeGroupButton)
+        {
             _itemScrollList.ActiveNumber = _currentItemIndex;
+        }
+        else if (ButtonGroupState.ActiveGroup == TargetGroupButton)
+        {
+            FF9Sfx.FF9SFX_Play(103);
+            this.ToggleMultipleTarget();
+        }
         return true;
     }
 
     public override Boolean OnItemSelect(GameObject go)
     {
-        if (base.OnItemSelect(go))
+        if (!base.OnItemSelect(go))
+            return true;
+        if (ButtonGroupState.ActiveGroup == SubMenuGroupButton)
         {
-            if (ButtonGroupState.ActiveGroup == SubMenuGroupButton)
+            if (_currentMenu != GetSubMenuFromGameObject(go))
             {
-                if (_currentMenu != GetSubMenuFromGameObject(go))
+                _currentMenu = GetSubMenuFromGameObject(go);
+                switch (_currentMenu)
                 {
-                    _currentMenu = GetSubMenuFromGameObject(go);
-                    switch (_currentMenu)
-                    {
-                        case SubMenu.Use:
-                        case SubMenu.Arrange:
-                            if (!ItemListPanel.activeSelf)
-                            {
-                                ItemListPanel.SetActive(true);
-                                KeyItemListPanel.SetActive(false);
-                                _usedItemIdList.Clear();
-                                DisplayItem();
-                            }
-                            break;
-                        case SubMenu.Key:
-                            if (!KeyItemListPanel.activeSelf)
-                            {
-                                ItemListPanel.SetActive(false);
-                                KeyItemListPanel.SetActive(true);
-                                DisplayKeyItem();
-                            }
-                            break;
-                    }
+                    case SubMenu.Use:
+                    case SubMenu.Arrange:
+                        if (!ItemListPanel.activeSelf)
+                        {
+                            ItemListPanel.SetActive(true);
+                            KeyItemListPanel.SetActive(false);
+                            _usedItemIdList.Clear();
+                            DisplayItem();
+                        }
+                        break;
+                    case SubMenu.Key:
+                        if (!KeyItemListPanel.activeSelf)
+                        {
+                            ItemListPanel.SetActive(false);
+                            KeyItemListPanel.SetActive(true);
+                            DisplayKeyItem();
+                        }
+                        break;
                 }
             }
-            else if (ButtonGroupState.ActiveGroup == ItemGroupButton || ButtonGroupState.ActiveGroup == KeyItemGroupButton)
-            {
-                Int32 itemDataIndex = go.GetComponent<RecycleListItem>().ItemDataIndex;
-                _currentItemIndex = itemDataIndex;
-            }
-            else if (ButtonGroupState.ActiveGroup == ItemArrangeGroupButton)
-            {
-                Int32 itemDataIndex = go.transform.parent.GetComponent<RecycleListItem>().ItemDataIndex;
-                _currentArrangeItemIndex = itemDataIndex;
-            }
+        }
+        else if (ButtonGroupState.ActiveGroup == ItemGroupButton || ButtonGroupState.ActiveGroup == KeyItemGroupButton)
+        {
+            Int32 itemDataIndex = go.GetComponent<RecycleListItem>().ItemDataIndex;
+            _currentItemIndex = itemDataIndex;
+        }
+        else if (ButtonGroupState.ActiveGroup == ItemArrangeGroupButton)
+        {
+            Int32 itemDataIndex = go.transform.parent.GetComponent<RecycleListItem>().ItemDataIndex;
+            _currentArrangeItemIndex = itemDataIndex;
         }
         return true;
     }
@@ -690,7 +714,7 @@ public class ItemUI : UIScene
                 ButtonGroupState.SetButtonAnimation(item.gameObject, true);
         }
         FF9UIDataTool.DisplayItem(fieldItemListData.ItemId, itemDetailHud.IconSprite, itemDetailHud.NameLabel, fieldItemListData.Enable);
-        itemDetailHud.NumberLabel.text = fieldItemListData.ItemCount.ToString();
+        itemDetailHud.NumberLabel.rawText = fieldItemListData.ItemCount.ToString();
         itemDetailHud.NumberLabel.color = !fieldItemListData.Enable ? FF9TextTool.Gray : FF9TextTool.White;
         itemDetailHud.Button.Help.Enable = true;
         itemDetailHud.Button.Help.Text = FF9TextTool.ItemHelpDescription(fieldItemListData.ItemId);
@@ -706,14 +730,8 @@ public class ItemUI : UIScene
         if (_keyItemIdList.Count == 0)
             _keyItemIdList.Add(FF9FITEM_RARE_NONE);
         List<ListDataTypeBase> inDataList = new List<ListDataTypeBase>();
-        using (List<Int32>.Enumerator enumerator = _keyItemIdList.GetEnumerator())
-        {
-            while (enumerator.MoveNext())
-            {
-                FieldKeyItemListData fieldKeyItemListData = new FieldKeyItemListData { KeyItemId = enumerator.Current };
-                inDataList.Add(fieldKeyItemListData);
-            }
-        }
+        foreach (Int32 keyItemId in _keyItemIdList)
+            inDataList.Add(new FieldKeyItemListData { KeyItemId = keyItemId });
         if (_keyItemScrollList.ItemsPool.Count == 0)
         {
             _keyItemScrollList.PopulateListItemWithData = DisplayKeyItemDetail;
@@ -745,7 +763,7 @@ public class ItemUI : UIScene
         else
         {
             keyItemDetailHud.NameLabel.gameObject.SetActive(true);
-            keyItemDetailHud.NameLabel.text = FF9TextTool.ImportantItemName(fieldKeyItemListData.KeyItemId);
+            keyItemDetailHud.NameLabel.rawText = FF9TextTool.ImportantItemName(fieldKeyItemListData.KeyItemId);
             if (ff9item.FF9Item_IsUsedImportant(fieldKeyItemListData.KeyItemId))
             {
                 keyItemDetailHud.NewIconSprite.spriteName = String.Empty;
@@ -763,39 +781,39 @@ public class ItemUI : UIScene
 
     private void DisplayTarget()
     {
-        Int32 num = 0;
+        Int32 hudIndex = 0;
         foreach (PLAYER player in FF9StateSystem.Common.FF9.party.member)
         {
-            CharacterDetailHUD targetHud = _targetHudList[num++];
+            CharacterDetailHUD targetHud = _targetHudList[hudIndex++];
             targetHud.Self.SetActive(true);
-            if (player != null)
+            if (player == null)
             {
-                targetHud.Content.SetActive(true);
-                FF9UIDataTool.DisplayCharacterDetail(player, targetHud);
-                FF9UIDataTool.DisplayCharacterAvatar(player, new Vector2(), new Vector2(), targetHud.AvatarSprite, false);
-                switch (ff9item.GetItemEffect(_itemIdList[_currentItemIndex]).info.DisplayStats)
-                {
-                    case TargetDisplay.None:
-                    case TargetDisplay.Hp:
-                    case TargetDisplay.Mp:
-                        targetHud.HPPanel.SetActive(true);
-                        targetHud.MPPanel.SetActive(true);
-                        targetHud.StatusesPanel.SetActive(false);
-                        continue;
-                    case TargetDisplay.Debuffs:
-                    case TargetDisplay.Buffs:
-                        targetHud.HPPanel.SetActive(false);
-                        targetHud.MPPanel.SetActive(false);
-                        targetHud.StatusesPanel.SetActive(true);
-                        continue;
-                    default:
-                        continue;
-                }
-            }
-            else
                 targetHud.Content.SetActive(false);
+                continue;
+            }
+            targetHud.Content.SetActive(true);
+            FF9UIDataTool.DisplayCharacterDetail(player, targetHud);
+            FF9UIDataTool.DisplayCharacterAvatar(player, new Vector2(), new Vector2(), targetHud.AvatarSprite, false);
+            switch (ff9item.GetItemEffect(_itemIdList[_currentItemIndex]).info.DisplayStats)
+            {
+                case TargetDisplay.None:
+                case TargetDisplay.Hp:
+                case TargetDisplay.Mp:
+                    targetHud.HPPanel.SetActive(true);
+                    targetHud.MPPanel.SetActive(true);
+                    targetHud.StatusesPanel.SetActive(false);
+                    continue;
+                case TargetDisplay.Debuffs:
+                case TargetDisplay.Buffs:
+                    targetHud.HPPanel.SetActive(false);
+                    targetHud.MPPanel.SetActive(false);
+                    targetHud.StatusesPanel.SetActive(true);
+                    continue;
+                default:
+                    continue;
+            }
         }
-        SetAvalableCharacter(false);
+        SetAvailableCharacter(false);
     }
 
     private void DisplayKeyItemSkin(Boolean visibility)
@@ -803,11 +821,9 @@ public class ItemUI : UIScene
         if (visibility)
         {
             Int32 keyItemId = _keyItemIdList[_currentItemIndex];
-            _keyItemDetailName.text = FF9TextTool.ImportantItemName(keyItemId);
+            _keyItemDetailName.rawText = FF9TextTool.ImportantItemName(keyItemId);
             _keyItemDetailDescription.spacingY = _defaultSkinLabelSpacingY;
-            String description = FF9TextTool.ImportantItemSkin(keyItemId);
-            Single additionalWidth = 0.0f;
-            _keyItemDetailDescription.text = _keyItemDetailDescription.PhrasePreOpcodeSymbol(description, ref additionalWidth);
+            _keyItemDetailDescription.rawText = FF9TextTool.ImportantItemSkin(keyItemId);
             Loading = true;
             // ISSUE: method pointer
             _keyItemSkinTransition.TweenIn(new Byte[1], () =>
@@ -834,50 +850,85 @@ public class ItemUI : UIScene
         }
     }
 
-    private void SetAvalableCharacter(Boolean includeEmpty)
+    private void SetAvailableCharacter(Boolean includeEmpty)
     {
-        List<CharacterDetailHUD> characterDetailHudList = new List<CharacterDetailHUD>();
+        List<CharacterDetailHUD> targetList = new List<CharacterDetailHUD>();
         if (!includeEmpty)
         {
-            using (List<CharacterDetailHUD>.Enumerator enumerator = _targetHudList.GetEnumerator())
+            foreach (CharacterDetailHUD charHUD in this._targetHudList)
             {
-                while (enumerator.MoveNext())
+                if (!this._multiTarget)
                 {
-                    CharacterDetailHUD current = enumerator.Current;
-                    if (current.Content.activeSelf)
+                    if (charHUD.Content.activeSelf)
                     {
-                        characterDetailHudList.Add(current);
-                        ButtonGroupState.SetButtonEnable(current.Self, true);
+                        targetList.Add(charHUD);
+                        ButtonGroupState.SetButtonEnable(charHUD.Self, true);
                     }
                     else
-                        ButtonGroupState.SetButtonEnable(current.Self, false);
+                    {
+                        ButtonGroupState.SetButtonEnable(charHUD.Self, false);
+                    }
                 }
             }
         }
         else
         {
-            using (List<CharacterDetailHUD>.Enumerator enumerator = _targetHudList.GetEnumerator())
+            foreach (CharacterDetailHUD charHUD in this._targetHudList)
             {
-                while (enumerator.MoveNext())
-                {
-                    CharacterDetailHUD current = enumerator.Current;
-                    characterDetailHudList.Add(current);
-                    ButtonGroupState.SetButtonEnable(current.Self, true);
-                }
+                targetList.Add(charHUD);
+                ButtonGroupState.SetButtonEnable(charHUD.Self, true);
             }
         }
-        for (Int32 index1 = 0; index1 < characterDetailHudList.Count; ++index1)
+        for (Int32 charIndex = 0; charIndex < targetList.Count; ++charIndex)
         {
-            Int32 index2 = index1 - 1;
-            Int32 index3 = index1 + 1;
-            if (index1 == 0)
-                index2 = characterDetailHudList.Count - 1;
-            if (index1 == characterDetailHudList.Count - 1)
-                index3 = 0;
-            UIKeyNavigation component = characterDetailHudList[index1].Self.GetComponent<UIKeyNavigation>();
-            component.onUp = characterDetailHudList[index2].Self;
-            component.onDown = characterDetailHudList[index3].Self;
+            Int32 prevIndex = charIndex - 1;
+            Int32 nextIndex = charIndex + 1;
+            if (charIndex == 0)
+                prevIndex = targetList.Count - 1;
+            if (charIndex == targetList.Count - 1)
+                nextIndex = 0;
+            UIKeyNavigation navig = targetList[charIndex].Self.GetComponent<UIKeyNavigation>();
+            navig.onUp = targetList[prevIndex].Self;
+            navig.onDown = targetList[nextIndex].Self;
         }
+    }
+
+    private Boolean CanToggleMulti(TargetType targetType)
+    {
+        switch (targetType)
+        {
+            case TargetType.ManyAny:
+            case TargetType.ManyAlly:
+            case TargetType.ManyEnemy:
+                break;
+            default:
+                return false;
+        }
+
+        Int32 membersCount = 0;
+        for (Int32 index = 0; index < 4; ++index)
+            if (FF9StateSystem.Common.FF9.party.member[index] != null)
+                if (++membersCount > 1)
+                    return true;
+
+        return false;
+    }
+
+    private void SetMultipleTarget(Boolean isActive)
+    {
+        ButtonGroupState.SetAllTarget(isActive);
+        this._multiTarget = isActive;
+        foreach (CharacterDetailHUD charHUD in this._targetHudList)
+            charHUD.Self.GetComponent<ButtonGroupState>().Help.Enable = !isActive;
+        ButtonGroupState.UpdateActiveButton();
+    }
+
+    private void ToggleMultipleTarget()
+    {
+        if (!this._canMultiTarget)
+            return;
+
+        this.SetMultipleTarget(!this._multiTarget);
     }
 
     private void ArrangeAuto()
@@ -906,7 +957,7 @@ public class ItemUI : UIScene
 
     public Boolean FF9FItem_Vegetable()
     {
-        if (PersistenSingleton<FF9StateSystem>.Instance.mode != 3 || FF9FITEM_CHOCOBO_NONE == FF9StateSystem.EventState.gEventGlobal[FF9FITEM_EVENT_KIND_CHOCOBO] || (FF9StateSystem.EventState.gEventGlobal[FF9FITEM_EVENT_VEGETABLE] != 0 || !ff9.w_frameChocoboCheck()))
+        if (PersistenSingleton<FF9StateSystem>.Instance.mode != 3 || FF9FITEM_CHOCOBO_NONE == FF9StateSystem.EventState.gEventGlobal[FF9FITEM_EVENT_KIND_CHOCOBO] || FF9StateSystem.EventState.gEventGlobal[FF9FITEM_EVENT_VEGETABLE] != 0 || !ff9.w_frameChocoboCheck())
             return false;
         FF9StateSystem.EventState.gEventGlobal[FF9FITEM_EVENT_VEGETABLE] = 1;
         _chocoboDialog = Singleton<DialogManager>.Instance.AttachDialog(Localization.Get("UseChocoboItem"), (Int32)(400.0 / UIManager.ResourceXMultipier), 1, Dialog.TailPosition.Center, Dialog.WindowStyle.WindowStylePlain, Vector2.zero, Dialog.CaptionType.Chocobo);
@@ -925,15 +976,15 @@ public class ItemUI : UIScene
         PersistenSingleton<UIManager>.Instance.MainMenuScene.ScreenFadeGameObject.GetParent().GetComponent<UIPanel>().depth = 100;
         _chocoboDialog.Hide();
 
-        SceneVoidDelegate fAmCache3 = () =>
+        SceneDirector.FF9Wipe_FadeInEx(12);
+        _fastSwitch = false;
+        Hide(delegate()
         {
             PersistenSingleton<UIManager>.Instance.MainMenuScene.SubMenuPanel.SetActive(false);
             PersistenSingleton<UIManager>.Instance.ChangeUIState(UIManager.UIState.WorldHUD);
             PersistenSingleton<UIManager>.Instance.MainMenuScene.NeedTweenAndHideSubMenu = true;
             PersistenSingleton<UIManager>.Instance.MainMenuScene.ScreenFadeGameObject.GetParent().GetComponent<UIPanel>().depth = 10;
-        };
-
-        Hide(fAmCache3);
+        });
     }
 
     private void Awake()
@@ -946,9 +997,7 @@ public class ItemUI : UIScene
         foreach (Component component in TargetListPanel.GetChild(0).transform)
         {
             GameObject go = component.gameObject;
-
             UIEventListener.Get(go).Click += onClick;
-
             _targetHudList.Add(new CharacterDetailHUD(go, true));
             if (FF9StateSystem.MobilePlatform)
                 go.GetComponent<ButtonGroupState>().Help.TextKey = "TargetHelpMobile";
@@ -957,41 +1006,28 @@ public class ItemUI : UIScene
         //this._importantItemHitArea = KeyItemDetailPanel.GetChild(0);
         _keyItemDetailName = KeyItemDetailPanel.GetChild(1).GetComponent<UILabel>();
         _keyItemDetailDescription = KeyItemDetailPanel.GetChild(2).GetComponent<UILabel>();
-        _keyItemDetailDescription.PrintIconAfterProcessedText = true;
         _defaultSkinLabelSpacingY = _keyItemDetailDescription.spacingY;
         _itemScrollList = ItemListPanel.GetChild(1).GetComponent<RecycleListPopulator>();
         _keyItemScrollList = KeyItemListPanel.GetChild(1).GetComponent<RecycleListPopulator>();
         _itemPanel = new GOScrollablePanel(ItemListPanel);
         _keyItemPanel = new GOScrollablePanel(KeyItemListPanel);
+        _arrangeDialog = new ArrangeDialogHUD(ArrangeDialog);
 
-        RemoveLeftAnchorFromItemNumberLabels();
-
-        UIEventListener.Get(ArrangeDialog.GetChild(0).GetChild(0)).Click += onClick;
-        UIEventListener.Get(ArrangeDialog.GetChild(0).GetChild(1)).Click += onClick;
+        foreach (var button in _arrangeDialog.Choices)
+            button.EventListener.Click += onClick;
 
         _targetTransition = TransitionGroup.GetChild(0).GetComponent<HonoTweenPosition>();
         _keyItemSkinTransition = TransitionGroup.GetChild(1).GetComponent<HonoTweenPosition>();
         _arrangeTransition = TransitionGroup.GetChild(2).GetComponent<HonoTweenClipping>();
 
-        if (Configuration.Control.WrapSomeMenus)
-        {
-            ArrangeDialog.GetChild(0).GetChild(0).GetExactComponent<UIKeyNavigation>().wrapUpDown = true;
-            ArrangeDialog.GetChild(0).GetChild(1).GetExactComponent<UIKeyNavigation>().wrapUpDown = true;
-        }
-    }
+        _background = new GOMenuBackground(this.transform.GetChild(6).gameObject, "item_bg");
 
-    private void RemoveLeftAnchorFromItemNumberLabels()
-    {
-        GameObject itemListCaptionBackgroundPanel = ItemListPanel.GetChild(2).GetChild(4);
-        foreach (UILabel label in itemListCaptionBackgroundPanel.GetComponentsInChildren<UILabel>(true))
-        {
-            if (label.text == "NUM")
-            {
-                label.leftAnchor.absolute -= 90;
-                label.UpdateAnchors();
-                return;
-            }
-        }
+        _itemPanel.Background.Panel.Name.Label.fixedAlignment = true;
+        _itemPanel.Background.Panel.Name2.Label.fixedAlignment = true;
+        _itemPanel.Background.Panel.Info.Label.leftAnchor.absolute -= 90;
+        _itemPanel.Background.Panel.Info2.Label.leftAnchor.absolute -= 90;
+        _keyItemPanel.Background.Panel.Name.Label.fixedAlignment = true;
+        _keyItemPanel.Background.Panel.Info.Label.fixedAlignment = true;
     }
 
     private struct KeyItemDetailHUD
@@ -1011,6 +1047,23 @@ public class ItemUI : UIScene
             NewIcon = go.GetChild(1).GetComponent<UIWidget>();
             NewIconSprite = go.GetChild(1).GetChild(0).GetComponent<UISprite>();
             NewIconLabelSprite = go.GetChild(1).GetChild(1).GetComponent<UISprite>();
+        }
+    }
+
+    private class ArrangeDialogHUD : GOPanel
+    {
+        public readonly UIPanel ChoicePanel;
+        public readonly List<GOSimpleButton<GOLocalizableLabel>> Choices;
+        public readonly GOFrameBackground Background;
+
+        public ArrangeDialogHUD(GameObject go) : base(go)
+        {
+            ChoicePanel = go.GetChild(0).GetComponent<UIPanel>();
+            Int32 choiceCount = go.GetChild(0).transform.childCount;
+            Choices = new List<GOSimpleButton<GOLocalizableLabel>>(choiceCount);
+            for (Int32 i = 0; i < choiceCount; i++)
+                Choices.Add(new GOSimpleButton<GOLocalizableLabel>(go.GetChild(0).GetChild(i)));
+            Background = new GOFrameBackground(go.GetChild(1));
         }
     }
 

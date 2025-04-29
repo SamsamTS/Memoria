@@ -42,7 +42,7 @@ namespace Memoria.Prime.CSV
         {
             raw = raw.Trim();
             if (raw.StartsWith("AA:"))
-			{
+            {
                 Int32 activeId = System.Int32.Parse(raw.Substring(3), NumberStyle, CultureInfo.InvariantCulture);
                 Int32 poolNum = activeId / 192;
                 Int32 idInPool = activeId % 192;
@@ -158,6 +158,14 @@ namespace Memoria.Prime.CSV
                 return new Int32[0];
 
             return raw.Split(',').Select(Int32).ToArray();
+        }
+
+        public static Single[] SingleArray(String raw)
+        {
+            if (System.String.IsNullOrEmpty(raw))
+                return new Single[0];
+
+            return raw.Split(',').Select(Single).ToArray();
         }
 
         public static String String(String raw)

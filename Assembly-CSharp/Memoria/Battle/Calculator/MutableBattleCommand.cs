@@ -1,6 +1,6 @@
-using System;
-using Memoria.Data;
 using FF9;
+using Memoria.Data;
+using System;
 
 namespace Memoria
 {
@@ -82,7 +82,7 @@ namespace Memoria
             set => Data.aa.Info.Target = value;
         }
 
-        public new BattleStatusIndex AbilityStatusIndex
+        public new StatusSetId AbilityStatusIndex
         {
             get => base.AbilityStatusIndex;
             set => Data.aa.AddStatusNo = value;

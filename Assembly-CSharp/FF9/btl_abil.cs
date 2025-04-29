@@ -7,11 +7,11 @@ namespace FF9
 {
     public static class btl_abil
     {
-        private static readonly RegularItem[] AutoPotionsItemIds = new RegularItem[]{ RegularItem.Potion, RegularItem.HiPotion };
+        private static readonly RegularItem[] AutoPotionsItemIds = new RegularItem[] { RegularItem.Potion, RegularItem.HiPotion };
 
         public static Boolean TryReturnMagic(BattleUnit returner, BattleUnit originalCaster, BattleCommand command)
         {
-            if (returner.IsUnderAnyStatus(BattleStatusConst.CannotAct) || FF9StateSystem.Battle.FF9Battle.btl_phase != 4) // TRANCE SEEK - VENOM
+            if (returner.IsUnderAnyStatus(BattleStatusConst.PreventCounter) || FF9StateSystem.Battle.FF9Battle.btl_phase != FF9StateBattleSystem.PHASE_NORMAL)
                 return false;
             BattleCommandId cmdId = originalCaster.IsPlayer ? BattleCommandId.Counter : BattleCommandId.MagicCounter;
             if (Configuration.Battle.CountersBetterTarget)
@@ -24,7 +24,7 @@ namespace FF9
                         for (Int32 i = 0; i < 4; i++)
                         {
                             BattleUnit new_target = btl_scrp.FindBattleUnit((UInt16)(retarget_id << i));
-                            if (new_target != null && new_target.Data.bi.target != 0 && !new_target.IsUnderStatus(BattleStatus.Death))
+                            if (new_target != null && new_target.Data.bi.target != 0 && !new_target.IsUnderStatus(BattleStatusId.Death))
                             {
                                 btl_cmd.SetCounter(returner.Data, cmdId, command.Data.sub_no, new_target.Id);
                                 return true;
@@ -48,7 +48,7 @@ namespace FF9
         public static Boolean CheckCounterAbility(BattleTarget defender, BattleCaster attacker, BattleCommand command)
         {
             // Dummied
-            if (defender.IsUnderAnyStatus(BattleStatusConst.NoReaction) || !btl_util.IsCommandDeclarable(command.Id))
+            if (defender.IsUnderAnyStatus(BattleStatusConst.Immobilized) || !btl_util.IsCommandDeclarable(command.Id))
                 return false;
 
             if (defender.HasSupportAbility(SupportAbility2.Counter) && (command.AbilityCategory & 8) != 0) // Physical
@@ -76,10 +76,10 @@ namespace FF9
             if (!defender.HasSupportAbility(SupportAbility2.AutoPotion))
                 return;
 
-            if (defender.IsUnderAnyStatus(BattleStatusConst.NoReaction) || !btl_util.IsCommandDeclarable(command.Id))
+            if (defender.IsUnderAnyStatus(BattleStatusConst.PreventCounter) || !btl_util.IsCommandDeclarable(command.Id))
                 return;
 
-            RegularItem itemId = IsDefualtAutoPotionBehaviourEnabled()
+            RegularItem itemId = IsDefaultAutoPotionBehaviourEnabled()
                 ? GetFirstPotionUseableByAutoItemAbility()
                 : FindSuitablePotion(defender, Configuration.Battle.AutoPotionOverhealLimit);
 
@@ -92,7 +92,7 @@ namespace FF9
             btl_cmd.SetCounter(defender.Data, BattleCommandId.AutoPotion, (Int32)itemId, defender.Id);
         }
 
-        private static bool IsDefualtAutoPotionBehaviourEnabled()
+        private static Boolean IsDefaultAutoPotionBehaviourEnabled()
         {
             return Configuration.Battle.AutoPotionOverhealLimit < 0;
         }
@@ -116,7 +116,7 @@ namespace FF9
         /// </returns>
         private static RegularItem FindSuitablePotion(BattleTarget defender, Int32 autoPotionOverhealLimitInPercent)
         {
-            RegularItem id = 0;
+            RegularItem id = RegularItem.NoItem;
             foreach (RegularItem itemId in AutoPotionsItemIds)
             {
                 if (ff9item.FF9Item_GetCount(itemId) < 1)
@@ -126,19 +126,18 @@ namespace FF9
 
                 // Every value below is in Hit Points, expect if specified otherwise.
                 UInt32 heal = (UInt32)calc.Target.HpDamage;
-                UInt32 toGain = defender.HasSupportAbility(SupportAbility1.Chemist) ? heal * 2 : heal;
                 UInt32 missing = calc.Target.MaximumHp - calc.Target.CurrentHp;
 
                 // If character gets healed by value smaller than missing hp it means
                 // there is no over healing done yet. Otherwise, check over healing limit set by user.
-                if (toGain <= missing)
+                if (heal <= missing)
                 {
                     id = itemId;
                 }
                 else
                 {
-                    UInt32 overhealDone = toGain - missing;
-                    UInt32 overhealLimit = (UInt32)(toGain * (autoPotionOverhealLimitInPercent / 100));
+                    UInt32 overhealDone = heal - missing;
+                    UInt32 overhealLimit = (UInt32)(heal * autoPotionOverhealLimitInPercent / 100);
 
                     if (overhealDone <= overhealLimit)
                         id = itemId;
@@ -232,9 +231,9 @@ namespace FF9
         public static void CheckReactionAbility(BTL_DATA btl, AA_DATA aa)
         {
             // Dummied
-            if (!btl_stat.CheckStatus(btl, BattleStatusConst.NoReaction))
+            if (!btl_stat.CheckStatus(btl, BattleStatusConst.Immobilized))
             {
-                if ((btl.sa[1] & (Int32)SupportAbility2.RestoreHP) != 0u && btl.cur.hp != 0 && Status.checkCurStat(btl, BattleStatus.LowHP))
+                if ((btl.sa[1] & (Int32)SupportAbility2.RestoreHP) != 0u && btl.cur.hp != 0 && btl_stat.CheckStatus(btl, BattleStatusId.LowHP))
                     btl.cur.hp = Math.Min(btl.cur.hp + btl.max.hp / 2, btl.max.hp);
                 if ((btl.sa[1] & (Int32)SupportAbility2.AbsorbMP) != 0u && aa.MP != 0)
                     btl.cur.mp = (UInt32)Math.Min(btl.cur.mp + aa.MP, btl.max.mp);

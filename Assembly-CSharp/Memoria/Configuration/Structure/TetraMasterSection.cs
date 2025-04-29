@@ -1,6 +1,6 @@
+using Memoria.Prime.Ini;
 using System;
 using System.Collections.Generic;
-using Memoria.Prime.Ini;
 
 namespace Memoria
 {
@@ -8,10 +8,11 @@ namespace Memoria
     {
         private sealed class TetraMasterSection : IniSection
         {
-            private static readonly HashSet<Int32> DefaultExclusions = new HashSet<Int32>(new[] {56, 75, 76, 77, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 98, 99, 100});
+            private static readonly HashSet<Int32> DefaultExclusions = new HashSet<Int32>(new[] { 56, 75, 76, 77, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 98, 99, 100 });
 
             public readonly IniValue<Int32> TripleTriad;
-            public readonly IniValue<Int32> ReduceRandom;
+            public readonly IniValue<Boolean> EasyWin;
+            public readonly IniValue<Boolean> ReduceRandom;
             public readonly IniValue<Int32> MaxCardCount;
 
             public readonly IniValue<Boolean> DiscardAutoButton;
@@ -29,7 +30,8 @@ namespace Memoria
             public TetraMasterSection() : base(nameof(TetraMasterSection), true)
             {
                 TripleTriad = BindInt32(nameof(TripleTriad), 0);
-                ReduceRandom = BindInt32(nameof(ReduceRandom), 0);
+                ReduceRandom = BindBoolean(nameof(ReduceRandom), false);
+                EasyWin = BindBoolean(nameof(EasyWin), false);
                 MaxCardCount = BindInt32(nameof(MaxCardCount), 100);
 
                 DiscardAutoButton = BindBoolean(nameof(DiscardAutoButton), true);

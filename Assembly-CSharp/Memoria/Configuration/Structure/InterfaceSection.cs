@@ -9,6 +9,9 @@ namespace Memoria
         {
             public readonly IniValue<Boolean> PSXBattleMenu;
             public readonly IniValue<Boolean> ScanDisplay;
+            public readonly IniValue<Boolean> SynthIngredientStockDisplayed;
+            public readonly IniValue<Boolean> DisplayPSXDiscChanges;
+            public readonly IniValue<Boolean> ThickerATBBar;
             public readonly IniValue<Int32> BattleRowCount;
             public readonly IniValue<Int32> BattleColumnCount;
             public readonly IniValue<Int32> BattleMenuPosX;
@@ -19,6 +22,9 @@ namespace Memoria
             public readonly IniValue<Int32> BattleDetailPosY;
             public readonly IniValue<Int32> BattleDetailWidth;
             public readonly IniValue<Int32> BattleDetailHeight;
+            public readonly IniValue<Int32> MinimapPreset;
+            public readonly IniValue<Int32> MinimapOffsetX;
+            public readonly IniValue<Int32> MinimapOffsetY;
             public readonly IniValue<String> BattleDamageTextFormat;
             public readonly IniValue<String> BattleRestoreTextFormat;
             public readonly IniValue<String> BattleMPDamageTextFormat;
@@ -36,6 +42,9 @@ namespace Memoria
             {
                 PSXBattleMenu = BindBoolean(nameof(PSXBattleMenu), false);
                 ScanDisplay = BindBoolean(nameof(ScanDisplay), true);
+                SynthIngredientStockDisplayed = BindBoolean(nameof(SynthIngredientStockDisplayed), true);
+                DisplayPSXDiscChanges = BindBoolean(nameof(DisplayPSXDiscChanges), true);
+                ThickerATBBar = BindBoolean(nameof(ThickerATBBar), false);
                 BattleRowCount = BindInt32(nameof(BattleRowCount), 5);
                 BattleColumnCount = BindInt32(nameof(BattleColumnCount), 1);
                 BattleMenuPosX = BindInt32(nameof(BattleMenuPosX), -400);
@@ -46,21 +55,24 @@ namespace Memoria
                 BattleDetailPosY = BindInt32(nameof(BattleDetailPosY), -380);
                 BattleDetailWidth = BindInt32(nameof(BattleDetailWidth), 796);
                 BattleDetailHeight = BindInt32(nameof(BattleDetailHeight), 230);
+                MinimapPreset = BindInt32(nameof(MinimapPreset), 1);
+                MinimapOffsetX = BindInt32(nameof(MinimapOffsetX), 0);
+                MinimapOffsetY = BindInt32(nameof(MinimapOffsetY), 0);
                 BattleDamageTextFormat = BindString(nameof(BattleDamageTextFormat), String.Empty);
                 BattleRestoreTextFormat = BindString(nameof(BattleRestoreTextFormat), String.Empty);
                 BattleMPDamageTextFormat = BindString(nameof(BattleMPDamageTextFormat), String.Empty);
                 BattleMPRestoreTextFormat = BindString(nameof(BattleMPRestoreTextFormat), String.Empty);
                 BattleCommandTitleFormat = BindString(nameof(BattleCommandTitleFormat), String.Empty);
 
-                MenuItemRowCount = BindInt32(nameof(MenuItemRowCount), 8); // Default PC: 8, PSX: 11
-                MenuAbilityRowCount = BindInt32(nameof(MenuAbilityRowCount), 6); // Default PC: 6, PSX: 8
-                MenuEquipRowCount = BindInt32(nameof(MenuEquipRowCount), 5); // Default PC: 5, PSX: 6
-                MenuChocographRowCount = BindInt32(nameof(MenuChocographRowCount), 5); // Default PC: 5, PSX: 7
+                MenuItemRowCount = BindInt32(nameof(MenuItemRowCount), 12); // Default PC: 8, PSX: 11
+                MenuAbilityRowCount = BindInt32(nameof(MenuAbilityRowCount), 9); // Default PC: 6, PSX: 8
+                MenuEquipRowCount = BindInt32(nameof(MenuEquipRowCount), 7); // Default PC: 5, PSX: 6
+                MenuChocographRowCount = BindInt32(nameof(MenuChocographRowCount), 7); // Default PC: 5, PSX: 7
                 // Shop menu -- Default PC: 5/8, PSX: 7/11 (with/without portraits)
                 // Status menu -- Default PC: 8, PSX: 8
                 // Config menu -- Default PC: 6/8, PSX: 9
 
-                FadeDuration = BindInt32(nameof(FadeDuration), 300);
+                FadeDuration = BindInt32(nameof(FadeDuration), 40);
             }
         }
     }

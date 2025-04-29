@@ -22,12 +22,18 @@ namespace Memoria
             public static Int32 TileSize => Instance._graphics.TileSize;
             public static Int32 AntiAliasing => Instance._graphics.AntiAliasing;
             public static Int32 CameraStabilizer => Instance._graphics.CameraStabilizer;
+            public static Int32 FieldSmoothTexture => Instance._graphics.FieldSmoothTexture;
+            public static Int32 WorldSmoothTexture => Instance._graphics.WorldSmoothTexture;
+            public static Int32 BattleSmoothTexture => Instance._graphics.BattleSmoothTexture;
+            public static Int32 ElementsSmoothTexture => Instance._graphics.ElementsSmoothTexture;
+            public static Int32 SFXSmoothTexture => Instance._graphics.SFXSmoothTexture;
+            public static Int32 UISmoothTexture => Instance._graphics.UISmoothTexture;
 
             private static volatile Boolean _widescreenSupport = InitializeWidescreenSupport();
 
             public static Boolean InitializeWidescreenSupport()
             {
-                if (!Instance._graphics.WidescreenSupport || (Instance._debug.Enabled && Instance._debug.StartFieldCreator))
+                if (!Instance._graphics.WidescreenSupport || (Instance._debug.Enabled && Instance._debug.StartFieldCreator) || Math.Abs((Double)Screen.width / (Double)Screen.height) < 1.34)
                 {
                     return false;
                 }

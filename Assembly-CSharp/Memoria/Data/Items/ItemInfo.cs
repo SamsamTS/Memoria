@@ -1,5 +1,5 @@
-﻿using System;
-using Memoria.Prime.CSV;
+﻿using Memoria.Prime.CSV;
+using System;
 
 namespace Memoria.Data
 {
@@ -7,14 +7,16 @@ namespace Memoria.Data
     {
         public RegularItem Id;
         public UInt32 Price;
+        public Int32 SellingPrice;
         public ItemCharacter CharacterMask;
-        public Byte GraphicsId;
-        public Byte ColorId;
+        public Int32 GraphicsId;
+        public Int32 ColorId;
         public Single Quality;
         public Int32 BonusId;
         public Int32[] AbilityIds;
         public ItemType TypeMask;
         public Single Order;
+        public String UseCondition;
         public Int32 WeaponId;
         public Int32 ArmorId;
         public Int32 EffectId;
@@ -30,8 +32,12 @@ namespace Memoria.Data
             EffectId = hasAuxIds || metadata.HasOption($"Include{nameof(EffectId)}") ? CsvParser.Int32(raw[index++]) : -1;
 
             Price = CsvParser.UInt32(raw[index++]);
-            GraphicsId = CsvParser.Byte(raw[index++]);
-            ColorId = CsvParser.Byte(raw[index++]);
+            if (metadata.HasOption($"Include{nameof(SellingPrice)}"))
+                SellingPrice = CsvParser.Int32(raw[index++]);
+            else
+                SellingPrice = (Int32)(Price / 2);
+            GraphicsId = CsvParser.Int32(raw[index++]);
+            ColorId = CsvParser.Int32(raw[index++]);
             Quality = CsvParser.Single(raw[index++]);
             BonusId = CsvParser.Int32(raw[index++]);
             AbilityIds = CsvParser.AnyAbilityArray(raw[index++]);
@@ -45,6 +51,11 @@ namespace Memoria.Data
             TypeMask = (ItemType)type;
 
             Order = CsvParser.Single(raw[index++]);
+
+            if (metadata.HasOption($"Include{nameof(UseCondition)}"))
+                UseCondition = CsvParser.String(raw[index++]);
+            else
+                UseCondition = String.Empty;
 
             UInt64 equippable = 0;
             for (Int32 i = 0; i < 12; i++)
@@ -72,8 +83,10 @@ namespace Memoria.Data
                 writer.Int32(EffectId);
 
             writer.UInt32(Price);
-            writer.Byte(GraphicsId);
-            writer.Byte(ColorId);
+            if (metadata.HasOption($"Include{nameof(SellingPrice)}"))
+                writer.Int32(SellingPrice);
+            writer.Int32(GraphicsId);
+            writer.Int32(ColorId);
             writer.Single(Quality);
             writer.Int32(BonusId);
             writer.AnyAbilityArray(AbilityIds);
@@ -88,6 +101,9 @@ namespace Memoria.Data
             writer.Boolean(Usable);
 
             writer.Single(Order);
+
+            if (metadata.HasOption($"Include{nameof(UseCondition)}"))
+                writer.String(UseCondition);
 
             writer.Boolean(Zidane);
             writer.Boolean(Vivi);
@@ -105,7 +121,7 @@ namespace Memoria.Data
 
         public FF9ITEM_DATA ToItemData()
         {
-            return new FF9ITEM_DATA(Price, (UInt64)CharacterMask, GraphicsId, ColorId, Quality, BonusId, AbilityIds, TypeMask, Order, WeaponId, ArmorId, EffectId);
+            return new FF9ITEM_DATA(Price, SellingPrice, (UInt64)CharacterMask, GraphicsId, ColorId, Quality, BonusId, AbilityIds, TypeMask, Order, UseCondition, WeaponId, ArmorId, EffectId);
         }
 
         public Boolean Weapon => (TypeMask & ItemType.Weapon) == ItemType.Weapon;
@@ -144,7 +160,8 @@ namespace Memoria.Data
         Gem = 2,
         Usable = 1,
 
-        AnyEquipment = Weapon | Armlet | Helmet | Armor | Accessory
+        AnyEquipment = Weapon | Armlet | Helmet | Armor | Accessory,
+        AnyItem = Item | Gem | Usable
     }
 
     [Flags]

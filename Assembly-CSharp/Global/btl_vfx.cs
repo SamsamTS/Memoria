@@ -1,10 +1,9 @@
 ﻿using System;
 using FF9;
 using Memoria;
-using Memoria.Data;
 using Memoria.Assets;
-using UnityEngine;
-using Object = System.Object;
+using Memoria.Data;
+using Memoria.Prime;
 
 public static class btl_vfx
 {
@@ -43,7 +42,8 @@ public static class btl_vfx
     {
         BTL_DATA regist = cmd.regist;
         BattleCommandId cmd_no = cmd.cmd_no;
-        if (cmd_no == BattleCommandId.AutoPotion || cmd_no == BattleCommandId.Item)
+        CharacterCommandType cmdType = btl_util.GetCommandTypeSafe(cmd_no);
+        if (cmdType == CharacterCommandType.Item)
             return (SpecialEffect)ff9item.GetItemEffect(btl_util.GetCommandItem(cmd)).info.VfxIndex;
         else if (cmd_no == BattleCommandId.SysTrans)
             return btl_stat.CheckStatus(regist, BattleStatus.Trance) ? SpecialEffect.Special_Trance_Activate : SpecialEffect.Special_Trance_End;
@@ -65,9 +65,9 @@ public static class btl_vfx
             else
                 return SpecialEffect.Steal_Blank;
         }
-        else if (cmd_no == BattleCommandId.Throw)
+        else if (cmdType == CharacterCommandType.Throw)
         {
-            Byte shape = ff9item._FF9Item_Data[btl_util.GetCommandItem(cmd)].shape;
+            Int32 shape = ff9item._FF9Item_Data[btl_util.GetCommandItem(cmd)].shape;
             if (shape == 1)
                 return SpecialEffect.Throw_Dagger;
             else if (shape == 2)
@@ -101,32 +101,12 @@ public static class btl_vfx
             else
                 return (SpecialEffect)cmd.aa.Info.VfxIndex;
         }
-        return SpecialEffect.Special_No_Effect;
     }
 
     public static void SelectCommandVfx(CMD_DATA cmd)
     {
-        if (cmd.cmd_no == BattleCommandId.Phantom)
-        {
-            BattleAbilityId abilId = btl_util.GetCommandMainActionIndex(cmd);
-            if (abilId == BattleAbilityId.Shiva)
-                FF9StateSystem.Battle.FF9Battle.phantom_no = BattleAbilityId.DiamondDust;
-            else if (abilId == BattleAbilityId.Ifrit)
-                FF9StateSystem.Battle.FF9Battle.phantom_no = BattleAbilityId.FlamesofHell;
-            else if (abilId == BattleAbilityId.Ramuh)
-                FF9StateSystem.Battle.FF9Battle.phantom_no = BattleAbilityId.JudgementBolt;
-            else if (abilId == BattleAbilityId.Atomos)
-                FF9StateSystem.Battle.FF9Battle.phantom_no = BattleAbilityId.WormHole;
-            else if (abilId == BattleAbilityId.Odin)
-                FF9StateSystem.Battle.FF9Battle.phantom_no = BattleAbilityId.Zantetsuken;
-            else if (abilId == BattleAbilityId.Leviathan)
-                FF9StateSystem.Battle.FF9Battle.phantom_no = BattleAbilityId.Tsunami;
-            else if (abilId == BattleAbilityId.Bahamut)
-                FF9StateSystem.Battle.FF9Battle.phantom_no = BattleAbilityId.MegaFlare;
-            else if (abilId == BattleAbilityId.Ark)
-                FF9StateSystem.Battle.FF9Battle.phantom_no = BattleAbilityId.EternalDarkness;
-        }
         BTL_DATA regist = cmd.regist;
+
         if (Configuration.Battle.SFXRework)
         {
             if (cmd.cmd_no != BattleCommandId.MagicCounter)
@@ -136,6 +116,11 @@ public static class btl_vfx
                     String sequenceText = AssetManager.LoadString(cmd.aa.Info.SequenceFile);
                     if (sequenceText != null)
                         cmd.aa.Info.VfxAction = new UnifiedBattleSequencer.BattleAction(sequenceText);
+                }
+                if (cmd.aa.Info.SequenceFile == null && regist != null && regist.bi.player == 0)
+                {
+                    if (regist.dms_geo_id == 427 && cmd.aa.Info.VfxIndex == 457) // Thunder Slash with Beatrix (Boss version)
+                        cmd.aa.Info.VfxAction = new UnifiedBattleSequencer.BattleAction(ThunderSlashBeatrixFix);
                 }
                 if (cmd.aa.Info.VfxAction != null)
                 {
@@ -199,45 +184,51 @@ public static class btl_vfx
     public static void SetTranceModel(BTL_DATA btl, Boolean isTrance)
     {
         CharacterSerialNumber serialNo = btl_util.getSerialNumber(btl);
+        CharacterBattleParameter btlParam = btl_mot.BattleParameterList[serialNo];
+        BattlePlayerCharacter.PlayerMotionIndex currentMotion = btl_mot.getMotion(btl);
         if (isTrance)
         {
             btl.battleModelIsRendering = true;
-            btl.tranceGo.SetActive(true);
-            btl.gameObject = btl.tranceGo;
+            btl.ChangeModel(btl.tranceGo, btl_init.GetModelID(serialNo, isTrance));
             GeoTexAnim.geoTexAnimPlay(btl.tranceTexanimptr, 2);
         }
         else
         {
             btl.battleModelIsRendering = true;
-            btl.originalGo.SetActive(true);
-            btl.tranceGo.SetActive(false);
-            btl.gameObject = btl.originalGo;
-            btl.dms_geo_id = btl_init.GetModelID(serialNo, isTrance);
+            btl.ChangeModel(btl.originalGo, btl_init.GetModelID(serialNo, isTrance));
             GeoTexAnim.geoTexAnimPlay(btl.texanimptr, 2);
         }
-        btl.meshCount = 0;
-        foreach (Object obj in btl.gameObject.transform)
-        {
-            Transform transform = (Transform)obj;
-            if (transform.name.Contains("mesh"))
-                btl.meshCount++;
-        }
-        btl.meshIsRendering = new Boolean[btl.meshCount];
-        for (Int32 i = 0; i < btl.meshCount; i++)
-            btl.meshIsRendering[i] = true;
-        btl_util.GeoSetABR(btl.gameObject, "PSX/BattleMap_StatusEffect");
+        btl_util.GeoSetABR(btl.gameObject, "PSX/BattleMap_StatusEffect", btl);
+        btl_mot.SetPlayerDefMotion(btl, serialNo, isTrance);
         BattlePlayerCharacter.InitAnimation(btl);
-        //btl_mot.setMotion(btl, BattlePlayerCharacter.PlayerMotionIndex.MP_IDLE_NORMAL);
-        geo.geoAttach(btl.weapon_geo, btl.gameObject, FF9StateSystem.Common.FF9.player[(CharacterId)btl.bi.slot_no].wep_bone);
-        //btl_eqp.InitWeapon(FF9StateSystem.Common.FF9.player[(CharacterId)btl.bi.slot_no], btl);
-        AnimationFactory.AddAnimToGameObject(btl.gameObject, btl_mot.BattleParameterList[serialNo].ModelId, true);
+        if (currentMotion != BattlePlayerCharacter.PlayerMotionIndex.MP_MAX)
+            btl.currentAnimationName = btl.mot[(Int32)currentMotion];
+        if (isTrance && btlParam.TranceParameters)
+        {
+            btl.weapon_bone = btl.weapon.ModelId != UInt16.MaxValue ? btlParam.TranceWeaponBone : -1;
+            btl.weaponModels[0].scale = btlParam.TranceWeaponSize.ToVector3(true);
+            btl.weaponModels[0].offset_pos = btlParam.TranceWeaponOffsetPos.ToVector3(false);
+            btl.weaponModels[0].offset_rot = btlParam.GetWeaponRotationFixed(btl.weapon.ModelId, true);
+        }
+        else
+        {
+            btl.weapon_bone = btl.weapon.ModelId != UInt16.MaxValue ? btlParam.WeaponBone : -1;
+            btl.weaponModels[0].scale = btlParam.WeaponSize.ToVector3(true);
+            btl.weaponModels[0].offset_pos = btlParam.WeaponOffsetPos.ToVector3(false);
+            btl.weaponModels[0].offset_rot = btlParam.GetWeaponRotationFixed(btl.weapon.ModelId, false);
+        }
+        geo.geoAttach(btl.weapon_geo, btl.gameObject, btl.weapon_bone);
+        btl2d.ShowMessages(true);
     }
 
     public static SpecialEffect GetPlayerAttackVfx(BTL_DATA btl)
     {
         CharacterSerialNumber serialNo = btl_util.getSerialNumber(btl);
         if (serialNo != CharacterSerialNumber.NONE)
-            return btl_mot.BattleParameterList[serialNo].AttackSequence;
+            return (btl_mot.BattleParameterList[serialNo].TranceParameters && btl_stat.CheckStatus(btl, BattleStatus.Trance)) ? 
+                btl_mot.BattleParameterList[serialNo].TranceAttackSequence : btl_mot.BattleParameterList[serialNo].AttackSequence;
         return SpecialEffect.Special_No_Effect;
     }
+
+    const String ThunderSlashBeatrixFix = "SetupReflect: Delay=SFXLoaded\r\nLoadMonsterSFX: SFX=Thunder_Slash_3 ; FirstBone=0 ; SecondBone=0 ; Args=0 ; Reflect=True\r\nWaitMonsterSFXLoaded: Reflect=True\r\nWaitAnimation: Char=Caster\r\nMessage: Text=[CastName] ; Priority=1 ; Title=True ; Reflect=False\r\nPlayAnimation: Char=Caster ; Anim=ANH_MON_B3_155_010\r\nWaitAnimation: Char=Caster\r\nPlayAnimation: Char=Caster ; Anim=ANH_MON_B3_155_011\r\nTurn: Char=Caster ; BaseAngle=AllTargets ; Angle=0 ; Time=6\r\nMoveToTarget: Char=Caster ; Target=AllTargets ; Time=6 ; Distance=1300\r\nWaitMove: Char=Caster\r\nPlayAnimation: Char=Caster ; Anim=ANH_MON_B3_155_012\r\nStartThread\r\n\tWait: Time=1\r\n\tPlaySound: Sound=673 ; Volume=1 ; Once=False\r\nEndThread\r\nWait: Time=10\r\nPlayMonsterSFX: Reflect=True\r\nWaitAnimation: Char=Caster\r\nPlayAnimation: Char=Caster ; Anim=ANH_MON_B3_155_013\r\nTurn: Char=Caster ; BaseAngle=Default ; Angle=0 ; Time=5\r\nMoveToPosition: Char=Caster ; Time=5 ; AbsolutePosition=Default ; MoveHeight=true\r\nWaitMove: Char=Caster\r\nPlayAnimation: Char=Caster ; Anim=ANH_MON_B3_155_014\r\nWaitAnimation: Char=Caster\r\nPlayAnimation: Char=Caster ; Anim=Idle\r\nWaitMonsterSFXDone: Reflect=True\r\nWaitTurn: Char=Caster\r\nActivateReflect\r\nWaitReflect\r\n";
 }

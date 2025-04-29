@@ -1,5 +1,5 @@
-using System;
 using Memoria.Prime.Ini;
+using System;
 
 namespace Memoria
 {
@@ -11,6 +11,7 @@ namespace Memoria
             public readonly IniValue<Boolean> StartModelViewer;
             public readonly IniValue<Boolean> StartFieldCreator;
             public readonly IniValue<Boolean> RenderWalkmeshes;
+            public readonly IniValue<Int32> Test;
 
             public DebugSection() : base(nameof(DebugSection), false)
             {
@@ -18,6 +19,7 @@ namespace Memoria
                 StartModelViewer = BindBoolean(nameof(StartModelViewer), false);
                 StartFieldCreator = BindBoolean(nameof(StartFieldCreator), false);
                 RenderWalkmeshes = BindBoolean(nameof(RenderWalkmeshes), false);
+                Test = BindInt32(nameof(Test), 100);
             }
         }
     }

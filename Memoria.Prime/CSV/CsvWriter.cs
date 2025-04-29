@@ -22,7 +22,7 @@ namespace Memoria.Prime.CSV
         }
 
         public void WriteMetaData(CsvMetaData metadata)
-		{
+        {
             String[] mdLines = metadata.GenerateLines();
             foreach (String line in mdLines)
                 _sw.WriteLine("#!" + line);
@@ -155,6 +155,11 @@ namespace Memoria.Prime.CSV
         }
 
         public void Int32Array(Int32[] array)
+        {
+            String(System.String.Join(", ", array.Select(v => v.ToString(CultureInfo.InvariantCulture)).ToArray()));
+        }
+
+        public void SingleArray(Single[] array)
         {
             String(System.String.Join(", ", array.Select(v => v.ToString(CultureInfo.InvariantCulture)).ToArray()));
         }

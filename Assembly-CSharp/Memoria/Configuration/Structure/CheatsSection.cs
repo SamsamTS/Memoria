@@ -1,6 +1,6 @@
+using Memoria.Prime.Ini;
 using System;
 using System.Collections.Generic;
-using Memoria.Prime.Ini;
 
 namespace Memoria
 {
@@ -8,8 +8,7 @@ namespace Memoria
     {
         private sealed class CheatsSection : IniSection
         {
-            public readonly IniValue<Boolean> Rotation;
-            public readonly IniValue<Boolean> Perspective;
+            public readonly IniValue<Boolean> AutoBattle;
 
             public readonly IniValue<Boolean> SpeedMode;
             public readonly IniValue<Int32> SpeedFactor;
@@ -24,8 +23,7 @@ namespace Memoria
 
             public CheatsSection() : base(nameof(CheatsSection), false)
             {
-                Rotation = BindBoolean(nameof(Rotation), false);
-                Perspective = BindBoolean(nameof(Perspective), false);
+                AutoBattle = BindBoolean(nameof(AutoBattle), true);
 
                 SpeedMode = BindBoolean(nameof(SpeedMode), false);
                 SpeedFactor = BindInt32(nameof(SpeedFactor), 3);

@@ -1,5 +1,5 @@
-﻿using System;
-using Memoria.Prime.CSV;
+﻿using Memoria.Prime.CSV;
+using System;
 
 namespace Memoria.Data
 {
@@ -9,7 +9,7 @@ namespace Memoria.Data
         public Int32 Id;
 
         public WeaponCategory Category;
-        public BattleStatusIndex StatusIndex;
+        public StatusSetId StatusIndex;
         public String ModelName;
         public UInt16 ModelId;
         public BTL_REF Ref;
@@ -24,7 +24,7 @@ namespace Memoria.Data
             Id = CsvParser.Int32(raw[1]);
 
             Category = (WeaponCategory)CsvParser.Byte(raw[2]);
-            StatusIndex = (BattleStatusIndex)CsvParser.Int32(raw[3]);
+            StatusIndex = (StatusSetId)CsvParser.Int32(raw[3]);
             ModelName = CsvParser.String(raw[4]);
             if (!String.IsNullOrEmpty(ModelName))
                 ModelId = (UInt16)FF9BattleDB.GEO.GetKey(ModelName);
@@ -43,17 +43,17 @@ namespace Memoria.Data
                 HitSfx = Byte.Parse(raw[11]);
             else
                 HitSfx = (Byte)Id;
+            CustomTexture = null;
             if (metadata.HasOption($"Include{nameof(CustomTexture)}"))
             {
-                var StringTexture = CsvParser.String(raw[12]);
-                CustomTexture = StringTexture.Split(',');
-				for (Int32 i = 0; i < CustomTexture.Length; i++)
-					CustomTexture[i] = CustomTexture[i].Trim();
+                String StringTexture = CsvParser.String(raw[12]);
+                if (StringTexture.Trim().Length > 0)
+                {
+                    CustomTexture = StringTexture.Split(',');
+                    for (Int32 i = 0; i < CustomTexture.Length; i++)
+                        CustomTexture[i] = CustomTexture[i].Trim();
+                }
             }
-			else
-			{
-                CustomTexture = new String[0];
-			}
         }
 
         public void WriteEntry(CsvWriter sw, CsvMetaData metadata)
@@ -76,7 +76,12 @@ namespace Memoria.Data
             if (metadata.HasOption($"Include{nameof(HitSfx)}"))
                 sw.Byte(HitSfx);
             if (metadata.HasOption($"Include{nameof(CustomTexture)}"))
-                sw.String(String.Join(", ", CustomTexture));
+            {
+                if (CustomTexture != null)
+                    sw.String(String.Join(", ", CustomTexture));
+                else
+                    sw.String(String.Empty);
+            }
         }
     }
 }

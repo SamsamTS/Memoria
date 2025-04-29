@@ -1,14 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.IO;
-using System.Text;
-using System.Threading;
 using Assets.Sources.Scripts.UI.Common;
 using Memoria.Prime;
 using Memoria.Prime.Text;
 using Memoria.Prime.Threading;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Threading;
 using ExtensionMethodsIEnumerable = Memoria.Scenes.ExtensionMethodsIEnumerable;
 
 namespace Memoria.Assets
@@ -47,7 +47,7 @@ namespace Memoria.Assets
             String directory = ModTextResources.Import.FieldsDirectory;
             if (!Directory.Exists(directory))
             {
-                Log.Warning($"[{TypeName}] Import was skipped bacause a directory does not exist: [{directory}].");
+                Log.Warning($"[{TypeName}] Import was skipped because a directory does not exist: [{directory}].");
                 return;
             }
 
@@ -65,7 +65,7 @@ namespace Memoria.Assets
                     _fieldZoneId = pair.Key;
                     _fieldFileName = _fieldZoneId.ToString("D4", CultureInfo.InvariantCulture) + '_' + pair.Value;
 
-                    if (!ReadEmbadedText(_fieldZoneId, out _original))
+                    if (!ReadEmbeddedText(_fieldZoneId, out _original))
                     {
                         _cache[_fieldZoneId] = null;
                         continue;
@@ -120,6 +120,7 @@ namespace Memoria.Assets
                 _original = null;
                 _external = null;
                 _fieldReplacements = null;
+                _fieldZoneId = -1;
             }
         }
 
@@ -191,9 +192,8 @@ namespace Memoria.Assets
                 String extension = Path.GetExtension(fileName); // .strings
 
                 fileName = fileName.Substring(0, fileName.Length - "_Tags".Length - extension.Length); // 0074_EVT_BATTLE_SIOTES01
-                TextResourceFormat format = TextResourceFormatHelper.ResolveFileFormat(extension);
 
-                TextResourcePath inputPath = new(new TextResourceReference(path), format);
+                TextResourcePath inputPath = TextResourcePath.ForImportExistingFile(path);
                 fieldNames[fileName] = ReadTagReplacements(inputPath);
             }
 
@@ -207,7 +207,7 @@ namespace Memoria.Assets
 
             return ReadTagReplacements(existingFile);
         }
-        
+
         private static IList<KeyValuePair<String, TextReplacement>> ReadTagReplacements(TextResourcePath existingFile)
         {
             TxtEntry[] generalNames = existingFile.ReadAll();
@@ -379,26 +379,30 @@ namespace Memoria.Assets
         protected override Boolean LoadInternal()
         {
             Int32 fieldZoneId = FF9TextTool.FieldZoneId;
+            String fieldLanguage = EmbadedTextResources.CurrentSymbol ?? Localization.CurrentSymbol;
+            if (fieldZoneId == FF9TextTool.LoadingZoneBatch.fieldZoneId && fieldLanguage == FF9TextTool.LoadingZoneBatch.fieldLangSymbol)
+                return true;
 
-            String[] text;
-            if (ReadEmbadedText(fieldZoneId, out text))
-            {
-                FF9TextTool.SetFieldText(text);
-                FF9TextTool.SetTableText(FF9TextTool.ExtractTableText(text));
-            }
+            FF9TextTool.LoadingZoneBatch.fieldText.Clear();
+            String path = EmbadedTextResources.GetCurrentPath("/Field/" + FF9TextTool.GetFieldTextFileName(fieldZoneId) + ".mes");
+            FF9TextTool.ImportStrtWithCumulativeModFiles<Int32>(path, FF9TextTool.LoadingZoneBatch.fieldText);
 
+            FF9TextTool.ClearTableText();
+
+            if (FF9TextTool.LoadingZoneBatch.fieldText.Count == 0)
+                return false;
+            FF9TextTool.LoadingZoneBatch.UpdateFieldZone(fieldZoneId, fieldLanguage);
             return true;
         }
 
-        private static Boolean ReadEmbadedText(Int32 fieldZoneId, out String[] text)
+        private static Boolean ReadEmbeddedText(Int32 fieldZoneId, out String[] text)
         {
             String path = EmbadedTextResources.GetCurrentPath("/Field/" + FF9TextTool.GetFieldTextFileName(fieldZoneId) + ".mes");
             String raw = EmbadedSentenseLoader.LoadText(path);
 
             if (raw != null)
             {
-                raw = TextOpCodeModifier.Modify(raw);
-                text = FF9TextTool.ExtractSentense(raw);
+                text = FF9TextTool.ExtractSentense(new Dictionary<Int32, String>(), raw).Values.ToArray();
                 return true;
             }
 
@@ -412,7 +416,7 @@ namespace Memoria.Assets
             {
                 if (!_initialized)
                     return false;
-                
+
                 Int32 fieldZoneId = FF9TextTool.FieldZoneId;
 
                 String[] result;
@@ -439,7 +443,7 @@ namespace Memoria.Assets
                     }
 
                     FF9TextTool.SetFieldText(result);
-                    FF9TextTool.SetTableText(FF9TextTool.ExtractTableText(result));
+                    FF9TextTool.ClearTableText();
                 }
 
                 return true;

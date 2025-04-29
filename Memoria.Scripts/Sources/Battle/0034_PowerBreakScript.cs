@@ -1,5 +1,5 @@
-using System;
 using Memoria.Data;
+using System;
 
 namespace Memoria.Scripts.Battle
 {
@@ -23,7 +23,7 @@ namespace Memoria.Scripts.Battle
             _v.MagicAccuracy();
             _v.Target.PenaltyShellHitRate();
             if (_v.TryMagicHit())
-                _v.Target.Strength = (Byte)(_v.Target.Strength * 3 / 4);
+                _v.Target.TryAlterSingleStatus(BattleStatusId.ChangeStat, true, _v.Caster, "Strength", _v.Target.Strength * 3 / 4);
         }
 
         public Single RateTarget()

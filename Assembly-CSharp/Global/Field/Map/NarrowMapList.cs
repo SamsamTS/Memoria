@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Memoria;
+
 public static class NarrowMapList
 {
     /// <summary>is mapId <= ScreenWidth</summary>
@@ -11,64 +13,72 @@ public static class NarrowMapList
 
         return false;
     }
-    public static Boolean SpecificScenesNarrow(Int32 mapId)
+
+    public static Boolean ConditionalForceNarrow(Int32 mapId)
     {
+        if (PersistenSingleton<EventEngine>.Instance.eBin == null)
+            return false;
         Int32 currIndex = PersistenSingleton<EventEngine>.Instance.eBin.getVarManually(EBin.MAP_INDEX_SVR);
         Int32 currCounter = PersistenSingleton<EventEngine>.Instance.eBin.getVarManually(EBin.SC_COUNTER_SVR);
 
-        foreach (int[] entry in RestrictedWidthScenesList)
-        {
-            if (entry[0] == mapId && (entry[1] == currIndex || entry[2] == currCounter))
+        //return RestrictedWidthScenesList.Any(entry => entry[0] == mapId && (entry[1] == currIndex || entry[2] == currCounter));
+        foreach (Int32[] entry in RestrictedWidthScenesList)
+            if (entry[0] == mapId && (FieldMap.ActualPsxScreenWidth > entry[1] || entry[1] == -5) && (entry[2] == currIndex || entry[2] == -5) && (entry[3] == currCounter || entry[3] == -5))
                 return true;
-        }
         return false;
     }
 
     public static Int32 MapWidth(Int32 mapId)
     {
-        if (SpecificScenesNarrow(mapId))
+        if (ConditionalForceNarrow(mapId))
             return 320;
 
-        foreach (int[] entry in MapWidthList)
-        {
+        //return MapWidthList.FirstOrDefault(entry => entry[0] == mapId)?[1] ?? 500;
+        foreach (Int32[] entry in MapWidthList)
             if (entry[0] == mapId)
                 return entry[1];
-        }
 
         return 500;
     }
 
     /// <summary>Make these scenes widescreen (based on index [1] or counter [2]), -5 is ignored</summary>
-    public static readonly int[][] RestrictedWidthScenesList =
+    public static readonly Int32[][] RestrictedWidthScenesList =
     {
-        // [mapNo,  EBin.MAP_INDEX_SVR,  EBin.SC_COUNTER_SVR], 
-        [150, 325, -5],       // Zidane infiltrate Alex Castle
-        [254, 26, -5],        // MBG103 - Evil Forest
-        [352, 3, -5],         // Arrival at Dali: vivi visible before sleeping
-        [1550, -5, 6270],     // Mountain path - Quina stays there
-        [1554, -5, 6300],     // MBG109 - roots
-        [1554, -5, 6305],     // MBG109 - roots
-        [1602, 16, -5],       // scene at Madain Sari night w/ Vivi/Zidane/Eiko eavesdropping,  bugged if you see too much
-        [1652, -5, 6700],     // Iifa entrance
-        [1652, -5, 6710],     // Iifa entrance
-        [1815, 0, -5],        // Love quiproquo at the docks
-        [1816, 315, -5],      // Love quiproquo at the docks
-        [1901, -5, 7550],     // Treno scene,  people staying there
-        [2007, -5, 8340],     // MBG111 - Alex castle changing
-        [2007, -5, 8400],     // MBG111 - Alex castle changing
-        [2173, -5, 9050],     // ATE Quina
-        [2211, 8, -5],        // Lindblum meeting after Alexander scene: ATE with kuja at his ship,  Zorn & Thorn visible too soon and blending
-        [2404, 25, -5],       // Baku seen waiting on the docks too soon
-        [2705, -1, -5],       // Pandemonium,  you're not alone sequence,  several glitches
-        [2706, -1, -5],       // Pandemonium,  you're not alone sequence,  several glitches
-        [2707, -1, -5],       // Pandemonium,  you're not alone sequence,  several glitches
-        [2708, -1, -5],       // Pandemonium,  you're not alone sequence,  several glitches
-        [2711, 0, -5],        // Pandemonium,  people are waiting in line after Kuja is defeated
-        [2905, -5, 11620],    // MBG118 - Memoria pink castle
+        // [mapNo, max screenwidth, EBin.MAP_INDEX_SVR, EBin.SC_COUNTER_SVR], 
+        [50, 478, -5, -5],
+        [70, 478, -5, -5],
+        [501, 478, -5, -5],
+        [507, 478, -5, -5],
+        [600, 432, -5, 3000],
+        [600, 432, -5, 3050],
+        [600, 432, -5, 3180],
+        [600, 432, -5, 3190],
+        //[850, 432, -5, 3118],
+
+        [150, -5, 325, -5],       // Zidane infiltrate Alex Castle - better in narrow for the "Alex" text
+        [254, -5, 26, -5],        // MBG103 - Evil Forest
+        [352, -5, 3, -5],         // Arrival at Dali: vivi visible before sleeping
+        [615, -5, 58, 3140],      // Lindblum tower scene part 2
+        [1554, -5, -5, 6300],     // MBG109 - roots
+        [1554, -5, -5, 6305],     // MBG109 - roots
+        [1602, -5, 16, -5],       // scene at Madain Sari night w/ Vivi/Zidane/Eiko eavesdropping
+        [1652, -5, -5, 6700],     // Iifa entrance
+        [1652, -5, -5, 6710],     // Iifa entrance
+        [1807, -5, -5, 8500],     // Cid etc. arrival at Alexandria attack
+        [1807, -5, -5, 8600],     // Cid etc. arrival at Alexandria attack
+        [2007, -5, -5, 8340],     // MBG111 - Alex castle changing
+        [2007, -5, -5, 8400],     // MBG111 - Alex castle changing
+        [2404, -5, 25, -5],       // Baku seen waiting on the docks too soon
+        [2705, -5, -1, -5],       // Pandemonium,  you're not alone sequence,  several glitches
+        [2706, -5, -1, -5],       // Pandemonium,  you're not alone sequence,  several glitches
+        [2707, -5, -1, -5],       // Pandemonium,  you're not alone sequence,  several glitches
+        [2708, -5, -1, -5],       // Pandemonium,  you're not alone sequence,  several glitches
+        [2711, -5, 0, -5],        // Pandemonium,  people are waiting in line after Kuja is defeated
+        [2905, -5, -5, 11620],    // MBG118 - Memoria pink castle
     };
 
     /// <summary>List of fields with narrower cams than widescreen, [field#, cam#, PSXWidth]</summary>
-    public static readonly int[][] RestrictedCams =
+    public static readonly Int32[][] RestrictedCams =
     {
         // [mapNo,cam,width],
         [50,1,320],
@@ -92,19 +102,19 @@ public static class NarrowMapList
         [1801,1,320],
         [1806,0,320],
         [1807,0,352],
-        [1823,1,320],
+        //[1823,1,320],
         [2150,1,320],
         [2172,1,320],
         [2217,1,320],
         [2217,2,320],
         [2363,0,384],
         [2363,1,336],
-        [2510,0,320],
+        //[2510,0,320],
         [2755,1,336],
     };
 
     /// <summary>List of fields of width smaller than widescreen, [field#,PSXWidth]</summary>
-    public static readonly int[][] MapWidthList =
+    public static readonly Int32[][] MapWidthList =
     {
         [50,480],
         [51,480],
@@ -228,7 +238,7 @@ public static class NarrowMapList
         [501,512],
         [502,320],
         [503,320],
-        [504,432],
+        [504,430],
         [505,398],
         [506,320],
         [507,512],
@@ -551,7 +561,7 @@ public static class NarrowMapList
         [1601,398],
         [1602,398],
         [1603,512],
-        [1604,398],
+        [1604,320], // 398 camera problems
         [1605,334],
         [1606,334],
         [1607,320],
@@ -584,7 +594,7 @@ public static class NarrowMapList
         [1751,334],
         [1752,350],
         [1753,320],
-        [1754,398],
+        [1754,320], // 398 scrolling problems
         [1755,320],
         [1756,320],
         [1757,350],
@@ -612,7 +622,7 @@ public static class NarrowMapList
         [1820,382],
         [1821,528],
         [1822,320],
-        [1823,432],
+        [1823,320], //432],
         [1824,480],
         [1850,320],
         [1851,640],
@@ -919,7 +929,7 @@ public static class NarrowMapList
     };
 
     /// <summary>Left and right margin of camera (because it goes too far), [field#,PSXmargin]</summary>
-    public static readonly Dictionary<int, int> mapCameraMargin = new Dictionary<int, int>
+    public static readonly Dictionary<Int32, Int32> mapCameraMargin = new Dictionary<Int32, Int32>
     {
         //{mapNo,pixels on each side to crop because of scrollable}
         {1051,9},

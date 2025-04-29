@@ -1,6 +1,6 @@
-﻿using System;
+﻿using Memoria.Prime;
+using System;
 using System.Linq;
-using Memoria.Prime;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -81,7 +81,7 @@ namespace Memoria
             UInt16 modelId = desc.Model;
             String modelName = FF9BattleDB.GEO.GetValue(modelId);
 
-            GameObject modelObject = ModelFactory.CreateModel(modelName);
+            GameObject modelObject = ModelFactory.CreateModel(modelName, false, true , Configuration.Graphics.ElementsSmoothTexture);
             modelObject.name = "obj" + actor.uid;
 
             actor.model = modelId;

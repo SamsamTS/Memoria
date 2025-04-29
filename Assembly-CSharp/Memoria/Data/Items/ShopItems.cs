@@ -1,7 +1,7 @@
-﻿using System;
-using System.Linq;
+﻿using Memoria.Prime.CSV;
+using System;
 using System.Collections.Generic;
-using Memoria.Prime.CSV;
+using System.Linq;
 
 namespace Memoria.Data
 {
@@ -14,6 +14,13 @@ namespace Memoria.Data
 
         public RegularItem this[Int32 index] => ItemIds[index];
         public Int32 Length => ItemIds.Count;
+
+        public ShopItems() { }
+        public ShopItems(Int32 id)
+        {
+            Comment = String.Empty;
+            Id = id;
+        }
 
         public void ParseEntry(String[] raw, CsvMetaData metadata)
         {
@@ -30,10 +37,10 @@ namespace Memoria.Data
                 Int32[] itemArray = CsvParser.ItemArray(value);
                 Boolean stop = false;
                 foreach (Int32 itemInt in itemArray)
-				{
+                {
                     RegularItem itemId = (RegularItem)itemInt;
                     if (itemId == RegularItem.NoItem)
-					{
+                    {
                         stop = true;
                         break;
                     }

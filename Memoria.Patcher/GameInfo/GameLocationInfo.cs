@@ -1,6 +1,6 @@
 using System;
-using System.IO;
 using System.Diagnostics;
+using System.IO;
 
 namespace Memoria.Patcher
 {
@@ -31,13 +31,17 @@ namespace Memoria.Patcher
 
         public void Validate()
         {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write("V ");
+            Console.ResetColor();
+            Console.WriteLine($"Path found: {LauncherPath}");
             if (!File.Exists(LauncherPath))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Error: File not found: {LauncherPath}");
+                Console.ResetColor();
                 throw new FileNotFoundException(LauncherPath, LauncherPath);
-        }
-
-        public Boolean IsValid()
-        {
-            return File.Exists(LauncherPath);
+            }
         }
 
         public Boolean FixSteamOverlay(Boolean fix)

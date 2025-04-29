@@ -1,12 +1,10 @@
-﻿using Assets.Sources.Scripts.UI.Common;
+﻿using Memoria;
+using Memoria.Data;
+using Memoria.Scenes;
 using System;
 using System.Collections.Generic;
-using Memoria;
-using Memoria.Assets;
-using Memoria.Scenes;
 using UnityEngine;
 using Object = System.Object;
-using Memoria.Data;
 
 public partial class BattleHUD : UIScene
 {
@@ -29,7 +27,6 @@ public partial class BattleHUD : UIScene
                 : base(obj)
             {
                 _scene = scene;
-
                 Attack = new GONavigationButton(obj.GetChild(0));
                 Defend = new GONavigationButton(obj.GetChild(1));
                 Skill1 = new GONavigationButton(obj.GetChild(2));
@@ -51,10 +48,9 @@ public partial class BattleHUD : UIScene
                     AccessMenu.IsActive = false;
                 }
                 else
-				{
+                {
                     AccessMenu = null;
                 }
-
                 SubscribeOnClick();
             }
 
@@ -65,7 +61,7 @@ public partial class BattleHUD : UIScene
 
             public void SetCaptionText(String text)
             {
-                Caption.Caption.Label.text = text;
+                Caption.Caption.Label.rawText = text;
             }
 
             public IEnumerable<GONavigationButton> EnumerateButtons(Boolean includeMenuIfPossible = true)

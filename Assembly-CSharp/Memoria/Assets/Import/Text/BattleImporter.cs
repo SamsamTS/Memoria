@@ -1,9 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using Assets.Sources.Scripts.UI.Common;
 using Memoria.Prime;
 using Memoria.Prime.Threading;
+using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace Memoria.Assets
 {
@@ -34,7 +34,7 @@ namespace Memoria.Assets
                 Int32 index = pair.Value;
                 if (index == 220 || index == 238) // Junk?
                     continue;
-                
+
                 String path = EmbadedTextResources.GetCurrentPath("/Battle/" + index + ".mes");
                 String[] text = EmbadedSentenseLoader.LoadSentense(path);
                 if (text != null)
@@ -59,7 +59,7 @@ namespace Memoria.Assets
             TextResourceReference importPath = ModTextResources.Import.Battle;
             if (!importPath.IsExists(out TextResourcePath existingFile))
             {
-                Log.Warning($"[{TypeName}] Import was skipped bacause a file does not exist: [{importPath}].");
+                Log.Warning($"[{TypeName}] Import was skipped because a file does not exist: [{importPath}].");
                 dic = null;
                 return false;
             }
@@ -77,11 +77,10 @@ namespace Memoria.Assets
         protected override Boolean LoadInternal()
         {
             Int32 battleZoneId = FF9TextTool.BattleZoneId;
+            FF9TextTool.LoadingZoneBatch.battleText.Clear();
             String path = EmbadedTextResources.GetCurrentPath("/Battle/" + battleZoneId + ".mes");
-            String[] text = EmbadedSentenseLoader.LoadSentense(path);
-            if (text != null)
-                FF9TextTool.SetBattleText(text);
-            return true;
+            FF9TextTool.ImportStrtWithCumulativeModFiles<Int32>(path, FF9TextTool.LoadingZoneBatch.battleText);
+            return FF9TextTool.LoadingZoneBatch.battleText.Count > 0;
         }
 
         protected override Boolean LoadExternal()

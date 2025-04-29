@@ -1,5 +1,6 @@
 ﻿using Assets.SiliconSocial;
 using FF9;
+using Memoria;
 using Memoria.Assets;
 using Memoria.Data;
 using Memoria.Prime;
@@ -7,7 +8,6 @@ using Memoria.Prime.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 
 // ReSharper disable FieldCanBeMadeReadOnly.Global
 // ReSharper disable UnusedMember.Global
@@ -47,7 +47,7 @@ public class ff9item
     {
         _FF9Item_Data = LoadItems();
         _FF9Item_Info = LoadItemEffects();
-        PatchItemEquipability(_FF9Item_Data);
+        PatchItemEquipability();
     }
 
     public static void FF9Item_Init()
@@ -93,14 +93,14 @@ public class ff9item
         }
     }
 
-    private static void PatchItemEquipability(Dictionary<RegularItem, FF9ITEM_DATA> itemDatabase)
+    private static void PatchItemEquipability()
     {
         try
         {
             String inputPath = DataResources.Items.PureDirectory + DataResources.Items.ItemEquipPatchFile;
             foreach (AssetManager.AssetFolder folder in AssetManager.FolderLowToHigh)
                 if (folder.TryFindAssetInModOnDisc(inputPath, out String fullPath, AssetManagerUtil.GetStreamingAssetsPath() + "/"))
-                    ApplyItemEquipabilityPatchFile(itemDatabase, File.ReadAllLines(fullPath));
+                    ApplyItemEquipabilityPatchFile(File.ReadAllLines(fullPath));
         }
         catch (Exception ex)
         {
@@ -479,42 +479,46 @@ public class ff9item
 
     public static Boolean CanThrowItem(RegularItem itemId)
     {
-        if (!HasItemWeapon(itemId))
+        return ff9item.CanThrowItem(_FF9Item_Data[itemId]);
+    }
+    public static Boolean CanThrowItem(FF9ITEM_DATA itemData)
+    {
+        if (!ff9weap.WeaponData.TryGetValue(itemData.weapon_id, out ItemAttack weapData))
             return false;
-        return (ff9item.GetItemWeapon(itemId).Category & WeaponCategory.Throw) != 0;
+        return (weapData.Category & WeaponCategory.Throw) != 0;
     }
 
     public static ItemAttack GetItemWeapon(RegularItem itemId)
     {
         FF9ITEM_DATA item = _FF9Item_Data[itemId];
-        if (item.weapon_id < 0 || !ff9weap.WeaponData.ContainsKey(item.weapon_id))
+        if (item.weapon_id < 0 || !ff9weap.WeaponData.TryGetValue(item.weapon_id, out ItemAttack result))
         {
             Log.Error($"[ff9item] Trying to use the weapon data of {itemId} which has no valid weapon data");
             return ff9weap.WeaponData[0];
         }
-        return ff9weap.WeaponData[item.weapon_id];
+        return result;
     }
 
     public static ItemDefence GetItemArmor(RegularItem itemId)
     {
         FF9ITEM_DATA item = _FF9Item_Data[itemId];
-        if (item.armor_id < 0 || !ff9armor.ArmorData.ContainsKey(item.armor_id))
+        if (item.armor_id < 0 || !ff9armor.ArmorData.TryGetValue(item.armor_id, out ItemDefence result))
         {
             Log.Error($"[ff9item] Trying to use the armor data of {itemId} which has no valid armor data");
             return ff9armor.ArmorData[0];
         }
-        return ff9armor.ArmorData[item.armor_id];
+        return result;
     }
 
     public static ITEM_DATA GetItemEffect(RegularItem itemId)
     {
         FF9ITEM_DATA item = _FF9Item_Data[itemId];
-        if (item.effect_id < 0 || !_FF9Item_Info.ContainsKey(item.effect_id))
+        if (item.effect_id < 0 || !_FF9Item_Info.TryGetValue(item.effect_id, out ITEM_DATA result))
         {
             Log.Error($"[ff9item] Trying to use the effect data of {itemId} which has no valid effect data");
             return _FF9Item_Info[0];
         }
-        return _FF9Item_Info[item.effect_id];
+        return result;
     }
 
     private static Int32 GetItemModuledId(Int32 itemId)
@@ -525,44 +529,48 @@ public class ff9item
     public static Object GetItemProperty(RegularItem itemId, String propertyName)
     {
         if (!_FF9Item_Data.TryGetValue(itemId, out FF9ITEM_DATA item))
-            return null;
+        {
+            Log.Error($"[ff9item] Unrecognized item \"{itemId}\"");
+            return -1;
+        }
         Boolean hasWeapon = HasItemWeapon(itemId);
         Boolean hasArmor = HasItemArmor(itemId);
         Boolean hasEffect = HasItemEffect(itemId);
         switch (propertyName)
         {
             case "Price": return item.price;
-            case "Shape": return (Int32)item.shape;
-            case "Color": return (Int32)item.color;
+            case "SellingPrice": return item.selling_price;
+            case "Shape": return item.shape;
+            case "Color": return item.color;
             case "EquipLevel": return item.eq_lv;
             case "SortOrder": return item.sort;
             case "Type": return (Int32)item.type;
-            case "WeaponCategory": return hasWeapon ? (Int32)GetItemWeapon(itemId).Category : null;
-            case "WeaponStatus": return hasWeapon ? (UInt32)FF9BattleDB.StatusSets[GetItemWeapon(itemId).StatusIndex].Value : null;
-            case "WeaponModelId": return hasWeapon ? (Int32)GetItemWeapon(itemId).ModelId : null;
-            case "WeaponScriptId": return hasWeapon ? GetItemWeapon(itemId).Ref.ScriptId : null;
-            case "WeaponPower": return hasWeapon ? GetItemWeapon(itemId).Ref.Power : null;
-            case "WeaponElement": return hasWeapon ? (Int32)GetItemWeapon(itemId).Ref.Elements : null;
-            case "WeaponStatusRate": return hasWeapon ? GetItemWeapon(itemId).Ref.Rate : null;
-            case "WeaponOffset1": return hasWeapon ? (Int32)GetItemWeapon(itemId).Offset1 : null;
-            case "WeaponOffset2": return hasWeapon ? (Int32)GetItemWeapon(itemId).Offset2 : null;
-            case "WeaponHitSfx": return hasWeapon ? (Int32)GetItemWeapon(itemId).HitSfx : null;
-            case "ArmorDefence": return hasArmor ? GetItemArmor(itemId).PhysicalDefence : null;
-            case "ArmorEvade": return hasArmor ? GetItemArmor(itemId).PhysicalEvade : null;
-            case "ArmorMagicDefence": return hasArmor ? GetItemArmor(itemId).MagicalDefence : null;
-            case "ArmorMagicEvade": return hasArmor ? GetItemArmor(itemId).MagicalEvade : null;
-            case "EffectTargetType": return hasEffect ? (Int32)GetItemEffect(itemId).info.Target : null;
-            case "EffectDefaultAlly": return hasEffect ? GetItemEffect(itemId).info.DefaultAlly : null;
-            case "EffectDisplayStats": return hasEffect ? (Int32)GetItemEffect(itemId).info.DisplayStats : null;
-            case "EffectVfxIndex": return hasEffect ? (Int32)GetItemEffect(itemId).info.VfxIndex : null;
-            case "EffectForDead": return hasEffect ? GetItemEffect(itemId).info.ForDead : null;
-            case "EffectDefaultCamera": return hasEffect ? GetItemEffect(itemId).info.DefaultCamera : null;
-            case "EffectDefaultOnDead": return hasEffect ? GetItemEffect(itemId).info.DefaultOnDead : null;
-            case "EffectScriptId": return hasEffect ? GetItemEffect(itemId).Ref.ScriptId : null;
-            case "EffectPower": return hasEffect ? GetItemEffect(itemId).Ref.Power : null;
-            case "EffectElement": return hasEffect ? (Int32)GetItemEffect(itemId).Ref.Elements : null;
-            case "EffectRate": return hasEffect ? GetItemEffect(itemId).Ref.Rate : null;
-            case "EffectStatus": return hasEffect ? (UInt32)GetItemEffect(itemId).status : null;
+            case "WeaponCategory": return hasWeapon ? (Int32)GetItemWeapon(itemId).Category : 0;
+            case "WeaponStatus": return hasWeapon ? (UInt64)FF9BattleDB.StatusSets[GetItemWeapon(itemId).StatusIndex].Value : 0;
+            case "WeaponModelId": return hasWeapon ? (Int32)GetItemWeapon(itemId).ModelId : -1;
+            case "WeaponScriptId": return hasWeapon ? GetItemWeapon(itemId).Ref.ScriptId : 0;
+            case "WeaponPower": return hasWeapon ? GetItemWeapon(itemId).Ref.Power : 0;
+            case "WeaponElement": return hasWeapon ? (Int32)GetItemWeapon(itemId).Ref.Elements : 0;
+            case "WeaponStatusRate": return hasWeapon ? GetItemWeapon(itemId).Ref.Rate : 0;
+            case "WeaponOffset1": return hasWeapon ? (Int32)GetItemWeapon(itemId).Offset1 : 0;
+            case "WeaponOffset2": return hasWeapon ? (Int32)GetItemWeapon(itemId).Offset2 : 0;
+            case "WeaponHitSfx": return hasWeapon ? (Int32)GetItemWeapon(itemId).HitSfx : 0;
+            case "ArmorDefence": return hasArmor ? GetItemArmor(itemId).PhysicalDefence : 0;
+            case "ArmorEvade": return hasArmor ? GetItemArmor(itemId).PhysicalEvade : 0;
+            case "ArmorMagicDefence": return hasArmor ? GetItemArmor(itemId).MagicalDefence : 0;
+            case "ArmorMagicEvade": return hasArmor ? GetItemArmor(itemId).MagicalEvade : 0;
+            case "EffectTargetType": return hasEffect ? (Int32)GetItemEffect(itemId).info.Target : 0;
+            case "EffectDefaultAlly": return hasEffect ? GetItemEffect(itemId).info.DefaultAlly : false;
+            case "EffectDisplayStats": return hasEffect ? (Int32)GetItemEffect(itemId).info.DisplayStats : 0;
+            case "EffectVfxIndex": return hasEffect ? (Int32)GetItemEffect(itemId).info.VfxIndex : -1;
+            case "EffectForDead": return hasEffect ? GetItemEffect(itemId).info.ForDead : false;
+            case "EffectDefaultCamera": return hasEffect ? GetItemEffect(itemId).info.DefaultCamera : false;
+            case "EffectDefaultOnDead": return hasEffect ? GetItemEffect(itemId).info.DefaultOnDead : false;
+            case "EffectScriptId": return hasEffect ? GetItemEffect(itemId).Ref.ScriptId : 0;
+            case "EffectPower": return hasEffect ? GetItemEffect(itemId).Ref.Power : 0;
+            case "EffectElement": return hasEffect ? (Int32)GetItemEffect(itemId).Ref.Elements : 0;
+            case "EffectRate": return hasEffect ? GetItemEffect(itemId).Ref.Rate : 0;
+            case "EffectStatus": return hasEffect ? (UInt64)GetItemEffect(itemId).status : 0;
         }
         if (propertyName.StartsWith("Ability ") && Int32.TryParse(propertyName.Substring("Ability ".Length), out Int32 index))
             return index >= 0 && index < item.ability.Length ? item.ability[index] : -1;
@@ -574,7 +582,7 @@ public class ff9item
         return -1;
     }
 
-    private static void ApplyItemEquipabilityPatchFile(Dictionary<RegularItem, FF9ITEM_DATA> itemDatabase, String[] allLines)
+    private static void ApplyItemEquipabilityPatchFile(String[] allLines)
     {
         foreach (String line in allLines)
         {
@@ -582,45 +590,32 @@ public class ff9item
             // (allows Garnet to equip Dagger and Mage Masher but disallows her to equip Tiger Racket)
             if (String.IsNullOrEmpty(line) || line.Trim().StartsWith("//"))
                 continue;
-            String[] allWords = line.Trim().Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            String[] allWords = line.Trim().Split(DataPatchers.SpaceSeparators, StringSplitOptions.RemoveEmptyEntries);
             if (allWords.Length < 3)
                 continue;
-            Int32 charId;
-            if (!Int32.TryParse(allWords[0], out charId))
+            if (!Int32.TryParse(allWords[0], out Int32 charId))
             {
-                CharacterId charIdAsStr;
-                if (!allWords[0].TryEnumParse(out charIdAsStr))
+                if (!allWords[0].TryEnumParse(out CharacterId charIdAsStr))
                     continue;
                 charId = (Int32)charIdAsStr;
             }
-            Boolean isAdd = false;
-            Boolean isRemove = false;
-            Int32 itemId;
+            Int32 currentOperation = -1;
             UInt64 charMask = ff9feqp.GetCharacterEquipMaskFromId((CharacterId)charId);
             for (Int32 wordIndex = 1; wordIndex < allWords.Length; wordIndex++)
             {
                 String word = allWords[wordIndex].Trim();
-                if (String.Compare(word, "Add") == 0)
+                if (String.Equals(word, "Add"))
+                    currentOperation = 0;
+                else if (String.Equals(word, "Remove"))
+                    currentOperation = 1;
+                else
                 {
-                    isAdd = true;
-                    isRemove = false;
-                }
-                else if (String.Compare(word, "Remove") == 0)
-                {
-                    isAdd = false;
-                    isRemove = true;
-                }
-                else if (isAdd)
-                {
-                    if (!Int32.TryParse(word, out itemId) || !itemDatabase.ContainsKey((RegularItem)itemId))
+                    if (!Int32.TryParse(word, out Int32 itemId) || !_FF9Item_Data.ContainsKey((RegularItem)itemId))
                         continue;
-                    itemDatabase[(RegularItem)itemId].equip |= charMask;
-                }
-                else if (isRemove)
-                {
-                    if (!Int32.TryParse(word, out itemId) || !itemDatabase.ContainsKey((RegularItem)itemId))
-                        continue;
-                    itemDatabase[(RegularItem)itemId].equip &= ~charMask;
+                    if (currentOperation == 0)
+                        _FF9Item_Data[(RegularItem)itemId].equip |= charMask;
+                    else if (currentOperation == 1)
+                        _FF9Item_Data[(RegularItem)itemId].equip &= ~charMask;
                 }
             }
         }

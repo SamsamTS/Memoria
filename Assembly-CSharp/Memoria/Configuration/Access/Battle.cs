@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace Memoria
 {
@@ -46,7 +47,6 @@ namespace Memoria
             public static String SpiritStatFormula => Instance._battle.SpiritStatFormula;
             public static String MagicStoneStockFormula => Instance._battle.MagicStoneStockFormula;
             public static String TranceDecreaseFormula => Instance._battle.TranceDecreaseFormula;
-
             private static Int32 GetBattleSpeed()
             {
                 Int32 value = Math.Max(Instance._battle.Speed, Instance._hacks.BattleSpeed);
@@ -55,7 +55,6 @@ namespace Memoria
 
                 return value;
             }
-
             public static void SaveBattleSpeed()
             {
                 // Battle needs to be enabled for the setting to be applied
@@ -63,6 +62,11 @@ namespace Memoria
                 SaveValue(Instance._battle.Name, Instance._battle.Enabled);
                 SaveValue(Instance._battle.Name, Instance._battle.Speed);
             }
+            public static Boolean IsMenuEnabledInBattle(MainMenuUI.SubMenu subMenu)
+            {
+                return AccessMenus > 0 && (AvailableMenus.Length == 0 || AvailableMenus.Contains(subMenu.ToString()));
+            }
+            public static Boolean IsKeepRestTimeInBattle => Instance._battle.KeepRestTimeInBattle;
         }
     }
 }

@@ -1,15 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Assets.Scripts.Common;
 using FF9;
 using Memoria;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
-using Assets.Scripts.Common;
 // ReSharper disable ClassNeverInstantiated.Global
 
 public partial class EventEngine
 {
     public Int32 ProcessEvents()
     {
+        EventEngine.LastProcessTime = RealTime.time;
         VoicePlayer.scriptRequestedButtonPress = false;
         if (FF9StateSystem.Settings.IsNoEncounter)
         {
@@ -98,19 +99,19 @@ public partial class EventEngine
         }
         if (isBattle)
             this.SetupBattleState();
-        
+
         this._posUsed = false;
-        
+
         // TODO Check Native: #147
         Int32 result = 0;
         bool canProcessCode = true;
 
         if (_ff9.fldMapNo == 257) // Evil Forest/Nest
             canProcessCode = !Singleton<DialogManager>.Instance.Activate || Singleton<DialogManager>.Instance.CompletlyVisible;
-        
+
         if (canProcessCode)
             result = this.eBin.ProcessCode(this._context.activeObj);
-        
+
         EventHUD.CheckUIMiniGameForMobile();
         if (result == 6)
             result = 0;
@@ -425,9 +426,9 @@ public partial class EventEngine
                         cameraMove.x = -1f;
                     else if (UIManager.Input.GetKey(Control.Right))
                         cameraMove.x = 1f;
-                    if (Mathf.Abs(cameraMove.y) > 0.1f)
+                    if (Mathf.Abs(cameraMove.y) > Configuration.AnalogControl.StickThreshold)
                         new_camera_position.y -= cameraMove.y * 5f;
-                    if (Mathf.Abs(cameraMove.x) > 0.1f)
+                    if (Mathf.Abs(cameraMove.x) > Configuration.AnalogControl.StickThreshold)
                         new_camera_position.x += cameraMove.x * 5f;
                     new_camera_position.x = Mathf.Clamp(new_camera_position.x, bgCamera.vrpMinX, bgCamera.vrpMaxX);
                     new_camera_position.y = Mathf.Clamp(new_camera_position.y, bgCamera.vrpMinY, bgCamera.vrpMaxY);
@@ -591,7 +592,7 @@ public partial class EventEngine
 
     private void SetupBattleState()
     {
-        if ((Int32)FF9StateSystem.Battle.FF9Battle.btl_phase == 0)
+        if (FF9StateSystem.Battle.FF9Battle.btl_phase == FF9StateBattleSystem.PHASE_INIT_SYSTEM)
             return;
         Int32 sysList = this.GetSysList(3);
         for (Int32 index = 4; index < 8; ++index)

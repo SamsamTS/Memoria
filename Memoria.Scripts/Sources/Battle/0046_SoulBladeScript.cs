@@ -1,5 +1,5 @@
-using System;
 using Memoria.Data;
+using System;
 
 namespace Memoria.Scripts.Battle
 {
@@ -39,8 +39,7 @@ namespace Memoria.Scripts.Battle
             }
 
             BattleStatus status = _v.Caster.WeaponStatus;
-            if ((status & BattleStatus.Death) == 0 || _v.Target.CheckUnsafetyOrGuard())
-                _v.Target.TryAlterStatuses(status, true, _v.Caster);
+            _v.Target.TryAlterStatuses(status, true, _v.Caster);
         }
     }
 }

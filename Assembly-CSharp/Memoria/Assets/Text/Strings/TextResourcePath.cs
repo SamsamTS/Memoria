@@ -24,15 +24,16 @@ namespace Memoria.Assets
             TextResourceReference reference = new(outputPath);
             return new TextResourcePath(reference, Configuration.Export.TextFileFormat);
         }
-        
+
         public static TextResourcePath ForImportExistingFile(String existingPath)
         {
             if (!File.Exists(existingPath))
                 throw new FileNotFoundException(existingPath);
 
             String extension = Path.GetExtension(existingPath);
+            String pathWithoutExtension = existingPath.Substring(0, existingPath.Length - extension.Length);
             TextResourceFormat format = TextResourceFormatHelper.ResolveFileFormat(extension);
-            TextResourceReference reference = new(existingPath);
+            TextResourceReference reference = new(pathWithoutExtension);
             return new TextResourcePath(reference, format);
         }
 
@@ -55,11 +56,11 @@ namespace Memoria.Assets
         {
             for (Int32 i = 0; i < entries.Count; i++)
                 entries[i].TryUpdateIndex(i);
-            
+
             ITextFormatter formatter = GetFormatter();
             formatter.GetWriter().WriteAll(Value, entries);
         }
-        
+
         public TxtEntry[] ReadAll()
         {
             ITextFormatter formatter = GetFormatter();

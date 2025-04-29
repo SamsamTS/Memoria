@@ -1,5 +1,5 @@
-using System;
 using Memoria.Data;
+using System;
 
 namespace Memoria.Scripts.Battle
 {
@@ -21,7 +21,7 @@ namespace Memoria.Scripts.Battle
         public void Perform()
         {
             _v.WeaponPhysicalParams(CalcAttackBonus.Simple);
-            _v.Context.Attack = _v.Context.Attack * 3 >> 1;
+            ++_v.Context.DamageModifierCount;
 
             _v.Caster.PenaltyMini();
             _v.Target.PhysicalPenaltyAndBonusAttack();

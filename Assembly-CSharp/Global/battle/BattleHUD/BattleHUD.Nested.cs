@@ -1,8 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using FF9;
+﻿using FF9;
 using Memoria;
 using Memoria.Data;
+using System;
+using System.Collections.Generic;
 
 public partial class BattleHUD : UIScene
 {
@@ -54,35 +54,61 @@ public partial class BattleHUD : UIScene
         Ability,
         Item,
         Throw,
-        Slide,
+        Instant,
     }
 
     [Flags]
     public enum LibraInformation : uint
     {
-        Name            = 0x1,
-        Level           = 0x2,
-        HP              = 0x4,
-        MP              = 0x8,
-        Category        = 0x10,
-        ElementWeak     = 0x20,
-        ItemSteal       = 0x40,
-        BlueLearn       = 0x80,
+        Name = 0x1,
+        Level = 0x2,
+        HP = 0x4,
+        MP = 0x8,
+        Category = 0x10,
+        ElementWeak = 0x20,
+        ItemSteal = 0x40,
+        BlueLearn = 0x80,
+        ElementResist = 0x100,
+        ElementImmune = 0x200,
+        ElementAbsorb = 0x400,
+        AttackList = 0x800,
+        StatusAuto = 0x1000,
+        StatusImmune = 0x2000,
+        StatusResist = 0x4000,
 
         NameLevel = Name | Level,
         HPMP = HP | MP,
+        ElementalAffinities = ElementWeak | ElementResist | ElementImmune | ElementAbsorb,
+        StatusAffinities = StatusAuto | StatusImmune | StatusResist,
 
-        Default = NameLevel | HPMP | Category | ElementWeak
+        Default = NameLevel | HPMP | Category | ElementWeak,
+        All = NameLevel | HPMP | ElementalAffinities | StatusAffinities | Category | ItemSteal | BlueLearn | AttackList
     }
+
+    private static readonly LibraInformation[] LibraAutoProcess =
+    {
+        LibraInformation.Category,
+        LibraInformation.ElementWeak,
+        LibraInformation.ElementResist,
+        LibraInformation.ElementImmune,
+        LibraInformation.ElementAbsorb,
+        LibraInformation.StatusAuto,
+        LibraInformation.StatusImmune,
+        LibraInformation.StatusResist,
+        LibraInformation.ItemSteal,
+        LibraInformation.BlueLearn,
+        LibraInformation.AttackList
+    };
 
     private class AbilityPlayerDetail
     {
-        public Character Player;
+        public PLAYER Player;
         public Boolean HasAp;
         public readonly Dictionary<Int32, Boolean> AbilityEquipList;
         public readonly Dictionary<Int32, Int32> AbilityPaList;
         public readonly Dictionary<Int32, Int32> AbilityMaxPaList;
         public readonly Dictionary<Int32, Boolean> AbilityTranceList;
+        public readonly Dictionary<Int32, BattleMagicSwordSet> AbilityMagicSet;
 
         public AbilityPlayerDetail()
         {
@@ -90,6 +116,7 @@ public partial class BattleHUD : UIScene
             AbilityPaList = new Dictionary<Int32, Int32>();
             AbilityMaxPaList = new Dictionary<Int32, Int32>();
             AbilityTranceList = new Dictionary<Int32, Boolean>();
+            AbilityMagicSet = new Dictionary<Int32, BattleMagicSwordSet>();
         }
 
         public void Clear()
@@ -98,18 +125,7 @@ public partial class BattleHUD : UIScene
             AbilityPaList.Clear();
             AbilityMaxPaList.Clear();
             AbilityTranceList.Clear();
-        }
-    }
-
-    private class MagicSwordCondition
-    {
-        public Boolean IsViviExist;
-        public Boolean IsViviDead;
-        public Boolean IsSteinerMini;
-
-        public Boolean Changed(MagicSwordCondition other)
-        {
-            return IsViviExist != other.IsViviExist || IsViviDead != other.IsViviDead || IsSteinerMini != other.IsSteinerMini;
+            AbilityMagicSet.Clear();
         }
     }
 
@@ -128,7 +144,7 @@ public partial class BattleHUD : UIScene
         public BattleCommandId CommandId;
 
         public PairCharCommand(Int32 pi, BattleCommandId ci)
-		{
+        {
             PlayerIndex = pi;
             CommandId = ci;
         }
@@ -156,7 +172,7 @@ public partial class BattleHUD : UIScene
     }
 
     private class PlayerMemo
-	{
+    {
         public PlayerMemo(PLAYER p, Boolean updateRow)
         {
             original = p;
@@ -184,7 +200,7 @@ public partial class BattleHUD : UIScene
                 battleRow = btl.bi.row;
                 p.info.row = battleRow;
             }
-            battlePermanentStatus = 0;
+            playerPermanentStatus = 0;
         }
 
         public PLAYER original;
@@ -195,6 +211,6 @@ public partial class BattleHUD : UIScene
         public CharacterSerialNumber serialNo;
         public Byte row;
         public Byte battleRow;
-        public BattleStatus battlePermanentStatus;
+        public BattleStatus playerPermanentStatus;
     }
 }

@@ -1,11 +1,12 @@
-﻿using System;
-using System.Linq;
-using System.Collections.Generic;
-using Assets.Scripts.Common;
+﻿using Assets.Scripts.Common;
 using Assets.Sources.Scripts.UI.Common;
 using Memoria;
 using Memoria.Assets;
 using Memoria.Data;
+using Memoria.Scenes;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Object = System.Object;
 
@@ -20,18 +21,20 @@ public class PartySettingUI : UIScene
 
     public class CharacterDetailPartyHUD : CharacterDetailHUD
     {
+        public GameObject MoveButton;
         public UILabel EmptyLabel;
         public UISprite[] StatusesAvatar;
 
         public CharacterDetailPartyHUD(GameObject go, Boolean isTargetHud) : base(go, isTargetHud)
         {
+            this.MoveButton = go.GetChild(2);
             this.EmptyLabel = go.GetChild(1).GetComponent<UILabel>();
-            this.StatusesAvatar = new[]
-            {
+            this.StatusesAvatar =
+            [
                 this.AvatarSprite.gameObject.GetChild(0).GetComponent<UISprite>(),
                 this.AvatarSprite.gameObject.GetChild(1).GetComponent<UISprite>(),
                 this.AvatarSprite.gameObject.GetChild(2).GetComponent<UISprite>()
-            };
+            ];
         }
     }
 
@@ -49,12 +52,14 @@ public class PartySettingUI : UIScene
             this.MoveButton = go.GetChild(0);
             this.Highlight = go.GetChild(1);
             this.Avatar = go.GetChild(2).GetComponent<UISprite>();
-            this.StatusesAvatar = new[]
-            {
+            this.StatusesAvatar =
+            [
                 go.GetChild(2).GetChild(0).GetComponent<UISprite>(),
                 go.GetChild(2).GetChild(1).GetComponent<UISprite>(),
                 go.GetChild(2).GetChild(2).GetComponent<UISprite>()
-            };
+            ];
+            this.Highlight.transform.localScale = new Vector3(Configuration.Graphics.WidescreenSupport ? 0.45f : 1f, 1f, 1f);
+            this.Highlight.GetComponent<UISprite>().SetDimensions(186, 232);
         }
     }
 
@@ -73,11 +78,17 @@ public class PartySettingUI : UIScene
     private static String SelectCharGroupButton = "Party.Select";
     private static String MoveCharGroupButton = "Party.Move";
 
+    [NonSerialized]
+    public Boolean AccessFromMenu = false;
+
     public GameObject HelpDespLabelGameObject;
     public GameObject CurrentPartyPanel;
     public GameObject OutsidePartyPanel;
     public GameObject HelpInfoPanel;
     public GameObject ScreenFadeGameObject;
+
+    [NonSerialized]
+    private GOMenuBackground background;
 
     private UILabel helpLabel;
     private CharacterDetailPartyHUD currentCharacterHud;
@@ -90,9 +101,9 @@ public class PartySettingUI : UIScene
     [NonSerialized]
     private Int32 currentFloor;
     private Int32 TotalCharCount
-	{
+    {
         get
-		{
+        {
             if (this.info == null)
                 return 0;
             Int32 count = this.info.menu.Sum(cId => cId != CharacterId.NONE ? 1 : 0);
@@ -100,7 +111,7 @@ public class PartySettingUI : UIScene
                 count += this.info.select.Sum(cId => cId != CharacterId.NONE ? 1 : 0);
             return count;
         }
-	}
+    }
     private Int32 FloorMax => Math.Max(0, (TotalCharCount - 6) / 4);
 
     public FF9PARTY_INFO Info
@@ -117,19 +128,13 @@ public class PartySettingUI : UIScene
 
         SceneVoidDelegate sceneVoidDelegate = delegate
         {
-            if (Configuration.Graphics.WidescreenSupport)
+            Single widthFactor = Configuration.Graphics.WidescreenSupport ? 0.45f : 1f;
+            foreach (CharacterOutsidePartyHud charHud in this.outsidePartyHudList)
             {
-                ButtonGroupState.SetPointerOffsetToGroup(new Vector2(150f, -18f), MoveCharGroupButton);
-                foreach (CharacterOutsidePartyHud charHud in this.outsidePartyHudList)
-                    charHud.Highlight.transform.localScale = new Vector3(0.45f, 1f, 1f);
+                charHud.Highlight.transform.localScale = new Vector3(widthFactor, 1f, 1f);
+                charHud.Highlight.GetComponent<UISprite>().SetRawRect(0, 0, 186, 232);
             }
-            else
-            {
-                ButtonGroupState.SetPointerOffsetToGroup(new Vector2(18f, -18f), MoveCharGroupButton);
-                foreach (CharacterOutsidePartyHud charHud in this.outsidePartyHudList)
-                    charHud.Highlight.transform.localScale = new Vector3(1f, 1f, 1f);
-            }
-
+            ButtonGroupState.SetPointerOffsetToGroup(new Vector2(18f, -18f), MoveCharGroupButton);
             ButtonGroupState.SetPointerDepthToGroup(6, MoveCharGroupButton);
             ButtonGroupState.ActiveGroup = SelectCharGroupButton;
         };
@@ -150,8 +155,10 @@ public class PartySettingUI : UIScene
             SceneDirector.FF9Wipe_FadeInEx(12);
         };
         if (afterFinished != null)
-            sceneVoidDelegate = (SceneVoidDelegate)Delegate.Combine(sceneVoidDelegate, afterFinished);
+            sceneVoidDelegate += afterFinished;
         base.Hide(sceneVoidDelegate);
+        if (this.AccessFromMenu)
+            PersistenSingleton<UIManager>.Instance.MainMenuScene.StartSubmenuTweenIn();
         BattleAchievement.UpdateParty();
         this.RemoveCursorMemorize();
     }
@@ -160,6 +167,20 @@ public class PartySettingUI : UIScene
     {
         ButtonGroupState.RemoveCursorMemorize(SelectCharGroupButton);
         ButtonGroupState.RemoveCursorMemorize(MoveCharGroupButton);
+    }
+
+    public void OnLocalize()
+    {
+        if (!isActiveAndEnabled)
+            return;
+        DisplayHelpInfo();
+        CharacterId[] menu = this.info.menu;
+        for (Int32 i = 0; i < menu.Length; i++)
+        {
+            CharacterDetailPartyHUD memberHUD = this.currentPartyHudList[i];
+            if (menu[i] == CharacterId.NONE)
+                memberHUD.EmptyLabel.rawText = String.Format(Localization.Get("EmptyCharNumber"), i + 1);
+        }
     }
 
     public override GameObject OnKeyNavigate(KeyCode direction, GameObject currentObj, GameObject nextObj)
@@ -174,7 +195,7 @@ public class PartySettingUI : UIScene
         if (!canChangeFloor)
             return null;
         if (direction == KeyCode.DownArrow && currentFloor < FloorMax)
-		{
+        {
             currentFloor++;
             DisplayOutsideCharacters();
             OnItemSelect(currentObj);
@@ -194,31 +215,38 @@ public class PartySettingUI : UIScene
     {
         if (!base.OnKeyConfirm(go))
             return true;
-        
+
         if (ButtonGroupState.ActiveGroup == SelectCharGroupButton)
         {
-            FF9Sfx.FF9SFX_Play(103);
-            this.currentCharacterSelect = this.GetCurrentSelect(go);
-            this.currentCharacterId = this.GetCurrentId(go);
-            ButtonGroupState.SetCursorStartSelect((this.currentCharacterSelect.Group != Mode.Menu) ? go.GetChild(0) : go.GetChild(2), MoveCharGroupButton);
-            ButtonGroupState.RemoveCursorMemorize(MoveCharGroupButton);
-            ButtonGroupState.ActiveGroup = MoveCharGroupButton;
-            ButtonGroupState.HoldActiveStateOnGroup(SelectCharGroupButton);
-            foreach (CharacterOutsidePartyHud current in this.outsidePartyHudList)
-                ButtonGroupState.SetButtonEnable(current.MoveButton, this.currentCharacterId == CharacterId.NONE || !this.info.fix.Contains(this.currentCharacterId));
-        }
-        else if (ButtonGroupState.ActiveGroup == MoveCharGroupButton)
-        {
-            PartySelect currentSelect = this.GetCurrentSelect(go);
             CharacterId currentId = this.GetCurrentId(go);
-            if (this.currentCharacterSelect.Group == Mode.Select && currentId != CharacterId.NONE && this.info.fix.Contains(currentId))
+            if (currentId != CharacterId.NONE && this.info.fix.Contains(currentId))
             {
                 FF9Sfx.FF9SFX_Play(102);
             }
             else
             {
                 FF9Sfx.FF9SFX_Play(103);
-                this.SwapCharacter(this.currentCharacterSelect, currentSelect);
+                this.currentCharacterSelect = this.GetCurrentSelect(go);
+                this.currentCharacterId = this.GetCurrentId(go);
+                ButtonGroupState.SetCursorStartSelect((this.currentCharacterSelect.Group != Mode.Menu) ? go.GetChild(0) : go.GetChild(2), MoveCharGroupButton);
+                ButtonGroupState.RemoveCursorMemorize(MoveCharGroupButton);
+                ButtonGroupState.ActiveGroup = MoveCharGroupButton;
+                ButtonGroupState.HoldActiveStateOnGroup(SelectCharGroupButton);
+                foreach (CharacterOutsidePartyHud current in this.outsidePartyHudList)
+                    ButtonGroupState.SetButtonEnable(current.MoveButton, this.currentCharacterId == CharacterId.NONE || !this.info.fix.Contains(this.currentCharacterId));
+            }
+        }
+        else if (ButtonGroupState.ActiveGroup == MoveCharGroupButton)
+        {
+            CharacterId currentId = this.GetCurrentId(go);
+            if (currentId != CharacterId.NONE && this.info.fix.Contains(currentId))
+            {
+                FF9Sfx.FF9SFX_Play(102);
+            }
+            else
+            {
+                FF9Sfx.FF9SFX_Play(103);
+                this.SwapCharacter(this.currentCharacterSelect, this.GetCurrentSelect(go));
                 this.DisplayCharacters();
                 this.DisplayCharacterInfo(this.currentCharacterId);
                 ButtonGroupState.SetCursorMemorize(go.transform.parent.gameObject, SelectCharGroupButton);
@@ -241,7 +269,11 @@ public class PartySettingUI : UIScene
                     FF9Sfx.FF9SFX_Play(103);
                     this.Hide(delegate
                     {
-                        PersistenSingleton<UIManager>.Instance.ChangeUIState(PersistenSingleton<UIManager>.Instance.HUDState);
+                        if (this.AccessFromMenu)
+                            PersistenSingleton<UIManager>.Instance.ChangeUIState(UIManager.UIState.MainMenu);
+                        else
+                            PersistenSingleton<UIManager>.Instance.ChangeUIState(PersistenSingleton<UIManager>.Instance.HUDState);
+                        this.AccessFromMenu = false;
                     });
                 }
                 else
@@ -285,30 +317,29 @@ public class PartySettingUI : UIScene
         switch (this.info.party_ct)
         {
             case 1:
-                this.helpLabel.text = Localization.Get("PartyHelp1Desp");
+                this.helpLabel.rawText = Localization.Get("PartyHelp1Desp");
                 break;
             case 2:
-                this.helpLabel.text = Localization.Get("PartyHelp2Desp");
+                this.helpLabel.rawText = Localization.Get("PartyHelp2Desp");
                 break;
             case 3:
-                this.helpLabel.text = Localization.Get("PartyHelp3Desp");
+                this.helpLabel.rawText = Localization.Get("PartyHelp3Desp");
                 break;
             case 4:
-                this.helpLabel.text = Localization.Get("PartyHelp4Desp");
+                this.helpLabel.rawText = Localization.Get("PartyHelp4Desp");
                 break;
             default:
-                this.helpLabel.text = Localization.Get("PartyHelp4Desp");
+                this.helpLabel.rawText = Localization.Get("PartyHelp4Desp");
                 break;
         }
     }
 
     private void DisplayCharacters()
     {
-        Int32 hudIndex = 0;
         CharacterId[] menu = this.info.menu;
         for (Int32 i = 0; i < menu.Length; i++)
         {
-            CharacterDetailPartyHUD characterDetailPartyHUD = this.currentPartyHudList[hudIndex++];
+            CharacterDetailPartyHUD characterDetailPartyHUD = this.currentPartyHudList[i];
             if (menu[i] != CharacterId.NONE)
             {
                 PLAYER player = FF9StateSystem.Common.FF9.GetPlayer(menu[i]);
@@ -320,7 +351,7 @@ public class PartySettingUI : UIScene
             }
             else
             {
-                characterDetailPartyHUD.EmptyLabel.text = String.Format(Localization.Get("EmptyCharNumber"), hudIndex);
+                characterDetailPartyHUD.EmptyLabel.rawText = String.Format(Localization.Get("EmptyCharNumber"), i + 1);
                 characterDetailPartyHUD.Content.SetActive(false);
                 characterDetailPartyHUD.EmptyLabel.gameObject.SetActive(true);
             }
@@ -390,7 +421,7 @@ public class PartySettingUI : UIScene
     {
         Int32 healthyCnt = 0;
         Int32 charCnt = 0;
-        for (Int32 i = 0; i < 4;i++)
+        for (Int32 i = 0; i < 4; i++)
         {
             if (this.info.menu[i] != CharacterId.NONE)
             {
@@ -400,6 +431,8 @@ public class PartySettingUI : UIScene
                     healthyCnt++;
             }
         }
+        if (this.info.exact_party_ct >= 0)
+            return charCnt == this.info.exact_party_ct && healthyCnt != 0;
         return charCnt >= this.info.party_ct && healthyCnt != 0;
     }
 
@@ -447,6 +480,8 @@ public class PartySettingUI : UIScene
             this.info.menu[oldSelect.Index] = char2;
         else if (oldSelect.Group == Mode.Select)
             this.info.select[4 * currentFloor + oldSelect.Index] = char2;
+        if (oldSelect.Group == Mode.Menu || newSelect.Group == Mode.Menu)
+            PersistenSingleton<UIManager>.Instance.MainMenuScene.ImpactfulActionCount++;
     }
 
     private void Awake()
@@ -468,10 +503,12 @@ public class PartySettingUI : UIScene
             this.outsidePartyHudList.Add(new CharacterOutsidePartyHud(go));
         }
         this.currentCharacterHud = new CharacterDetailPartyHUD(this.OutsidePartyPanel.GetChild(0), false);
+        this.background = new GOMenuBackground(this.transform.GetChild(5).gameObject, "party_setting_bg");
+        this.CurrentPartyPanel.GetChild(1).GetChild(2).GetComponent<UILabel>().rightAnchor.Set(1f, -40);
     }
 
     private void ExtendSelectSlots()
-	{
+    {
         Int32 oldCount;
         if (this.info.select == null)
         {
@@ -481,7 +518,7 @@ public class PartySettingUI : UIScene
                 this.info.select[i] = CharacterId.NONE;
         }
         else
-		{
+        {
             oldCount = this.info.select.Length;
         }
         Int32 count = 8 + FloorMax * 4;
@@ -517,6 +554,7 @@ public class PartySettingUI : UIScene
         }
 
         partyInfo.select = selectList.ToArray();
-        partyInfo.party_ct = 1;
+        if (FF9StateSystem.EventState.ScenarioCounter != 9520) // Prevent selecting fewer than 4 characters when Kuja sends a team to Oeilvert (to properly setup an initial team)
+            partyInfo.party_ct = 1;
     }
 }

@@ -1,36 +1,39 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using FF9;
+﻿using FF9;
 using Memoria;
 using Memoria.Assets;
 using Memoria.Data;
 using Memoria.Prime;
 using Memoria.Prime.Collections;
 using Memoria.Prime.CSV;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 public static partial class FF9BattleDB
 {
-    public static readonly Dictionary<BattleStatusIndex, BattleStatusEntry> StatusSets;
+    public static readonly Dictionary<StatusSetId, BattleStatusEntry> StatusSets;
     public static readonly Dictionary<BattleAbilityId, AA_DATA> CharacterActions;
-    public static readonly Dictionary<Int32, STAT_DATA> StatusData;
+    public static readonly Dictionary<BattleStatusId, BattleStatusDataEntry> StatusData;
     public static readonly Dictionary<Int32, BattleMagicSwordSet> MagicSwordData;
+    public static readonly BattleStatus AllStatuses = 0;
 
     static FF9BattleDB()
-	{
-	    StatusSets = LoadStatusSets();
-	    CharacterActions = LoadActions();
+    {
+        StatusSets = LoadStatusSets();
+        CharacterActions = LoadActions();
         StatusData = LoadStatusData();
         MagicSwordData = LoadMagicSwordSets();
+        foreach (BattleStatusId statusId in StatusData.Keys)
+            AllStatuses |= statusId.ToBattleStatus();
     }
 
-    private static Dictionary<BattleStatusIndex, BattleStatusEntry> LoadStatusSets()
+    private static Dictionary<StatusSetId, BattleStatusEntry> LoadStatusSets()
     {
         try
         {
             String inputPath = DataResources.Battle.PureDirectory + DataResources.Battle.StatusSetsFile;
-            Dictionary<BattleStatusIndex, BattleStatusEntry> result = new Dictionary<BattleStatusIndex, BattleStatusEntry>();
+            Dictionary<StatusSetId, BattleStatusEntry> result = new Dictionary<StatusSetId, BattleStatusEntry>();
             foreach (BattleStatusEntry[] statusSets in AssetManager.EnumerateCsvFromLowToHigh<BattleStatusEntry>(inputPath))
                 foreach (BattleStatusEntry set in statusSets)
                     result[set.Id] = set;
@@ -70,21 +73,21 @@ public static partial class FF9BattleDB
         }
     }
 
-    private static Dictionary<Int32, STAT_DATA> LoadStatusData()
+    private static Dictionary<BattleStatusId, BattleStatusDataEntry> LoadStatusData()
     {
         try
         {
             String inputPath = DataResources.Battle.PureDirectory + DataResources.Battle.StatusDataFile;
-            Dictionary<Int32, STAT_DATA> result = new Dictionary<Int32, STAT_DATA>();
+            Dictionary<BattleStatusId, BattleStatusDataEntry> result = new Dictionary<BattleStatusId, BattleStatusDataEntry>();
             foreach (BattleStatusDataEntry[] statusData in AssetManager.EnumerateCsvFromLowToHigh<BattleStatusDataEntry>(inputPath))
                 foreach (BattleStatusDataEntry it in statusData)
-                    result[it.Id] = it.Value;
+                    result[it.Id] = it;
             inputPath = DataResources.Battle.Directory + DataResources.Battle.StatusDataFile;
             if (result.Count == 0)
                 throw new FileNotFoundException($"File with status datas not found: [{inputPath}]");
-            for (Int32 i = 0; i < 32; i++)
-                if (!result.ContainsKey(i))
-                    throw new NotSupportedException($"You must define at least 32 status datas, with IDs between 0 and 31");
+            for (Int32 i = 0; i < 33; i++)
+                if (!result.ContainsKey((BattleStatusId)i))
+                    throw new NotSupportedException($"You must define at least 33 status datas, with IDs between 0 and 32");
             return result;
         }
         catch (Exception ex)

@@ -1,8 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using Memoria.Assets;
+﻿using Memoria.Assets;
 using Memoria.Data;
 using Memoria.Prime;
+using System;
+using System.Collections.Generic;
 
 namespace FF9
 {
@@ -12,10 +12,10 @@ namespace FF9
 
         static ff9mixitem()
         {
-            MixItemsData = LoadSynthesis();
+            MixItemsData = LoadMixes();
         }
 
-        private static Dictionary<Int32, MixItems> LoadSynthesis()
+        private static Dictionary<Int32, MixItems> LoadMixes()
         {
             try
             {
@@ -24,7 +24,7 @@ namespace FF9
                 foreach (MixItems[] mixDatabase in AssetManager.EnumerateCsvFromLowToHigh<MixItems>(inputPath))
                     foreach (MixItems mix in mixDatabase)
                         result[mix.Id] = mix;
-                        
+
                 return result;
             }
             catch (Exception ex)

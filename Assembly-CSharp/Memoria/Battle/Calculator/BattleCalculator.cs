@@ -1,10 +1,11 @@
-using System;
-using System.Linq;
-using System.Collections.Generic;
+using Assets.Sources.Scripts.UI.Common;
 using FF9;
 using Memoria.Data;
+using Memoria.Scripts;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
-using Assets.Sources.Scripts.UI.Common;
 using Object = System.Object;
 
 namespace Memoria
@@ -71,13 +72,15 @@ namespace Memoria
     public static class BattleState
     {
         public static Boolean IsSpecialStart => FF9StateSystem.Battle.FF9Battle.btl_scene.Info.SpecialStart;
-        public static Boolean IsBattleStateEnabled => UIManager.Battle.FF9BMenu_IsEnable();
-        public static Boolean IsATBEnabled => UIManager.Battle.FF9BMenu_IsEnable() && UIManager.Battle.FF9BMenu_IsEnableAtb();
-        public static Int32 ATBTickCount => HonoluluBattleMain.counterATB; // Number of times the ATB advanced this tick (there are 2 or more only in turn-based and fast speed modes)
+        public static Boolean IsBattleStateEnabled => UIManager.Battle.FF9BMenu_IsEnable() || (PersistenSingleton<UIManager>.Instance.State == UIManager.UIState.Tutorial && PersistenSingleton<UIManager>.Instance.TutorialScene.DisplayMode == TutorialUI.Mode.Libra);
+        public static Boolean IsATBEnabled => HonoluluBattleMain.counterATB > 0 || (UIManager.Battle.FF9BMenu_IsEnable() && UIManager.Battle.FF9BMenu_IsEnableAtb());
+        public static Int32 ATBTickCount => HonoluluBattleMain.counterATB; // Number of times the ATB advanced this tick (it can be 2 or more only in turn-based and fast speed modes)
         public static Int32 SharedATBSpeedCoef => btl_para.GetATBCoef(); // Default increment for each ATB advancement
         public static Boolean IsRandomBattle => FF9StateSystem.Battle.isRandomEncounter && !IsFriendlyBattle;
         public static Boolean IsFriendlyBattle => ff9.w_friendlyBattles.Contains((UInt16)FF9StateSystem.Battle.battleMapIndex);
         public static Boolean IsRagtimeBattle => ff9.w_ragtimeBattles.Contains((UInt16)FF9StateSystem.Battle.battleMapIndex);
+        public static Boolean IsFlee => FF9StateSystem.Common.FF9.btl_result == FF9StateGlobal.BTL_RESULT_ESCAPE;
+        public static Boolean IsFleeByLuck => FF9StateSystem.Common.FF9.btl_result == FF9StateGlobal.BTL_RESULT_ESCAPE && (FF9StateSystem.Common.FF9.btl_flag & battle.BTL_FLAG_ABILITY_FLEE) == 0;
         public static BattleCommand EscapeCommand => new BattleCommand(FF9StateSystem.Battle.FF9Battle.cmd_escape);
         public static Int32 TargetCount(Boolean isPlayer)
         {
@@ -137,6 +140,8 @@ namespace Memoria
 
         public static BattleUnit GetPlayerUnit(CharacterId id)
         {
+            if (id == CharacterId.NONE)
+                return null;
             foreach (BattleUnit unit in EnumerateUnits())
                 if (unit.PlayerIndex == id)
                     return unit;
@@ -146,7 +151,8 @@ namespace Memoria
 
     public sealed class BattleCalculator
     {
-        public static List<BattleCalculator> FrameAppliedEffectList = new List<BattleCalculator>();
+        public static readonly IOverloadDamageModifierScript DamageModifierScript = ScriptsLoader.GetOverloadedMethod(typeof(IOverloadDamageModifierScript)) as IOverloadDamageModifierScript;
+        public static readonly List<BattleCalculator> FrameAppliedEffectList = new List<BattleCalculator>();
 
         public readonly CalcContext Context;
         public readonly BattleCommand Command;
@@ -164,7 +170,7 @@ namespace Memoria
 
         public BattleCalculator(BTL_DATA caster, BTL_DATA target, BattleCommand command)
         {
-            Context = new CalcContext();
+            Context = new CalcContext(this);
             Command = command;
             Caster = new BattleCaster(caster, Context);
             Target = new BattleTarget(target, Context);
@@ -194,16 +200,9 @@ namespace Memoria
 
         public void WeaponPhysicalParams()
         {
-            if (Caster.IsNonMorphedPlayer)
-            {
-                SetWeaponPower();
-                Caster.SetLowPhysicalAttack();
-                Target.SetPhysicalDefense();
-            }
-            else
-            {
-                NormalPhysicalParams();
-            }
+            SetWeaponPower();
+            Caster.SetLowPhysicalAttack();
+            Target.SetPhysicalDefense();
         }
 
         public void WeaponPhysicalParams(CalcAttackBonus bonus)
@@ -281,18 +280,9 @@ namespace Memoria
 
         public Boolean CanEscape()
         {
-            FF9StateBattleSystem ff9Battle = FF9StateSystem.Battle.FF9Battle;
-            if (!ff9Battle.btl_scene.Info.Runaway)
+            if (!FF9StateSystem.Battle.FF9Battle.btl_scene.Info.Runaway)
                 return false;
-
-            for (BTL_DATA next = ff9Battle.btl_list.next; next != null; next = next.next)
-            {
-                BattleUnit unit = new BattleUnit(next);
-                if (next.bi.player != 0 && !unit.IsUnderAnyStatus(BattleStatusConst.CannotEscape))
-                    return true;
-            }
-
-            return false;
+            return BattleState.EnumerateUnits().Any(unit => unit.IsPlayer && !unit.IsUnderAnyStatus(BattleStatusConst.CannotEscape));
         }
 
         public Boolean IsCasterNotTarget()
@@ -369,7 +359,7 @@ namespace Memoria
 
             Int16 rate = (Int16)(200 / (enemyLevels / enemyCount) * (playerLevels / playerCount) / 16);
             if (rate > Comn.random16() % 100)
-                btl_cmd.SetCommand(FF9StateSystem.Battle.FF9Battle.cmd_escape, BattleCommandId.SysEscape, 1, 15, 1U);
+                btl_cmd.SetCommand(FF9StateSystem.Battle.FF9Battle.cmd_escape, BattleCommandId.SysEscape, 1, 15, 1u);
         }
 
         public Boolean TryPhysicalHit()
@@ -380,7 +370,7 @@ namespace Memoria
             Target.PenaltyDefenceHitRate();
             Target.PenaltyBanishHitRate();
             if (Target.IsUnderAnyStatus(BattleStatus.Float))
-                Context.Evade += (Int16)Configuration.Battle.FloatEvadeBonus;
+                Context.Evade += Configuration.Battle.FloatEvadeBonus;
 
             foreach (SupportingAbilityFeature saFeature in ff9abil.GetEnabledSA(Caster))
                 saFeature.TriggerOnAbility(this, "HitRateSetup", false);
@@ -607,7 +597,7 @@ namespace Memoria
                     Caster.HasSupportAbility(SupportAbility1.DevilKiller) && hasCategory(enemy, EnemyCategory.Devil) ||
                     Caster.HasSupportAbility(SupportAbility1.BeastKiller) && hasCategory(enemy, EnemyCategory.Beast) ||
                     Caster.HasSupportAbility(SupportAbility1.ManEater) && hasCategory(enemy, EnemyCategory.Humanoid))
-                    Context.Attack = Context.Attack * 3 >> 1;
+                    ++Context.DamageModifierCount;
             }
         }
         public void BonusMpAttack()
@@ -615,7 +605,7 @@ namespace Memoria
             // Dummied
             if (Caster.HasSupportAbility(SupportAbility1.MPAttack) && Caster.CurrentMp > 0)
             {
-                Context.Attack = Context.Attack * 3 >> 1;
+                ++Context.DamageModifierCount;
                 Context.Flags |= BattleCalcFlags.MpAttack;
             }
         }
@@ -630,15 +620,15 @@ namespace Memoria
         public void BonusBackstabAndPenaltyLongDistance()
         {
             if (IsCasterSameDirectionTarget() || Target.IsRunningAway())
-                Context.Attack = Context.Attack * 3 >> 1;
+                ++Context.DamageModifierCount;
 
             // Note that there are two weapon categories: SHORT_RANGE and LONG_RANGE
             // LONG_RANGE is used for this penalty while SHORT_RANGE is used both for that and for "out of range" enemies
             if (Mathf.Abs(Caster.Row - Target.Row) > 1 && !Caster.HasLongRangeWeapon && Command.IsShortRange)
-                Context.Attack /= 2;
+                --Context.DamageModifierCount;
         }
 
-        public void BonusBackstabAndPenaltyLongDistanceAsDamageModifiers()
+        public void BonusBackstabAndPenaltyLongDistanceVisually()
         {
             if (IsCasterVisuallySameDirectionTarget())
                 ++Context.DamageModifierCount;
@@ -660,8 +650,10 @@ namespace Memoria
 
         public void TryCriticalHit()
         {
+            if ((Target.Flags & CalcFlag.Critical) != 0) // In case another system triggered a critical strike (with possibly other consequences)
+                return;
             Int32 quarterWill = Caster.Data.elem.wpr >> 2;
-            if (quarterWill != 0 && (Comn.random16() % quarterWill) + Caster.Data.critical_rate_deal_bonus + Target.Data.critical_rate_receive_bonus > Comn.random16() % 100)
+            if (quarterWill != 0 && (Comn.random16() % quarterWill) + Caster.CriticalRateBonus - Target.CriticalRateResistance > Comn.random16() % 100)
             {
                 Context.Attack *= 2; // In case TryCriticalHit is called before "Calc...HpDamage"
                 Target.HpDamage *= 2; // In case TryCriticalHit is called after "Calc...HpDamage"
@@ -683,10 +675,10 @@ namespace Memoria
 
         public void SetWeaponPower()
         {
-            if (Caster.IsNonMorphedPlayer)
-                Context.AttackPower = (Int16)(Caster.GetWeaponPower(Command) * Command.Power / 10);
+            if (btl_util.IsCommandMonsterTransform(Command))
+                Context.AttackPower = Command.Power;
             else
-                SetCommandPower();
+                Context.AttackPower = (Int16)(Caster.GetWeaponPower(Command) * Command.Power / 10);
         }
 
         public void SetWeaponPowerSum()
@@ -702,7 +694,7 @@ namespace Memoria
         public void PenaltyCommandDividedAttack()
         {
             if (Command.IsDevided)
-                Context.Attack /= 2;
+                --Context.DamageModifierCount;
         }
 
         public void PenaltyCommandDividedHitRate()
@@ -732,7 +724,7 @@ namespace Memoria
             }
         }
 
-        public Boolean ApplyElementAsDamageModifiers(EffectElement element, EffectElement elementForBonus)
+        public Boolean ApplyElementFullStack(EffectElement element, EffectElement elementForBonus)
         {
             if ((element & Target.GuardElement) != 0)
             {
@@ -742,16 +734,16 @@ namespace Memoria
             if ((element & Target.AbsorbElement) != 0)
                 Context.Flags |= BattleCalcFlags.Absorb;
 
-            Context.DamageModifierCount += (SByte)Comn.countBits((UInt16)(Caster.BonusElement & elementForBonus));
-            Context.DamageModifierCount += (SByte)Comn.countBits((UInt16)(Target.WeakElement & element));
-            Context.DamageModifierCount -= (SByte)Comn.countBits((UInt16)(Target.HalfElement & element));
+            Context.DamageModifierCount += Comn.countBits((UInt16)(Caster.BonusElement & elementForBonus));
+            Context.DamageModifierCount += Comn.countBits((UInt16)(Target.WeakElement & element));
+            Context.DamageModifierCount -= Comn.countBits((UInt16)(Target.HalfElement & element));
             return true;
         }
 
         public void BonusElement()
         {
             if ((Command.ElementForBonus & Caster.BonusElement) != 0)
-                Context.Attack = (Int16)(Context.Attack * 3 >> 1);
+                ++Context.DamageModifierCount;
         }
 
         public void StealItem(BattleEnemy enemy, Int32 slot)
@@ -777,8 +769,8 @@ namespace Memoria
 
         public void RaiseTrouble()
         {
-            if (Command.Data.tar_id == Target.Id && Target.IsUnderAnyStatus(BattleStatus.Trouble) && (Context.AddedStatuses & BattleStatus.Trouble) == 0 && (Target.Flags & CalcFlag.HpRecovery) == 0)
-                Target.Data.fig_info |= Param.FIG_INFO_TROUBLE;
+            if (Command.Data.tar_id == Target.Id && Target.IsUnderAnyStatus(BattleStatusConst.ApplyTrouble & ~Context.AddedStatuses))
+                Target.Data.fig.info |= Param.FIG_INFO_TROUBLE;
         }
     }
 }

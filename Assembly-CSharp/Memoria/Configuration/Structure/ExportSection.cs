@@ -1,6 +1,6 @@
 using Memoria.Assets;
-using System;
 using Memoria.Prime.Ini;
+using System;
 
 namespace Memoria
 {
@@ -8,7 +8,7 @@ namespace Memoria
     {
         private sealed class ExportSection : IniSection
         {
-            private static readonly String[] DefaultLanguages = {"US", "UK", "JP", "ES", "FR", "GR", "IT"};
+            private static readonly String[] DefaultLanguages = { "US", "UK", "JP", "ES", "FR", "GR", "IT" };
 
             public readonly IniValue<String> Path;
             public readonly IniArray<String> Languages;
@@ -18,6 +18,7 @@ namespace Memoria
             public readonly IniValue<Boolean> Audio;
             public readonly IniValue<Boolean> Field;
             public readonly IniValue<Boolean> Battle;
+            public readonly IniValue<Boolean> Translation;
 
             public ExportSection() : base(nameof(ExportSection), false)
             {
@@ -29,6 +30,7 @@ namespace Memoria
                 Audio = BindBoolean(nameof(Audio), false);
                 Field = BindBoolean(nameof(Field), false);
                 Battle = BindBoolean(nameof(Battle), false);
+                Translation = BindBoolean(nameof(Translation), false);
             }
         }
     }

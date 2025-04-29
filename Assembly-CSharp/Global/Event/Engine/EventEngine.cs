@@ -1,11 +1,11 @@
-using System;
 using Assets.Sources.Scripts.EventEngine.Utils;
 using Assets.Sources.Scripts.UI.Common;
 using FF9;
 using Memoria;
+using Memoria.Data;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using Memoria.Data;
 using UnityEngine;
 using static EventEngine;
 using Debug = UnityEngine.Debug;
@@ -54,6 +54,7 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
     public String sOriginalFieldName;
     #endregion
     public Int16 sOriginalFieldNo;
+    /// <summary>gamemode: 1=Field, 2=Battle, 3=Worldmap, 4=End of Battle</summary>
     public Int32 gMode;
     public Obj gCur;
     public Int32 gArgFlag;
@@ -70,7 +71,6 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
     public Int64 sLockTimer;
     public Int64 sLockFree;
     public EBin eBin;
-    public ETb eTb;
     public Byte[][] allObjsEBData;
     public List<Int32> toBeAddedObjUIDList;
     public Boolean requiredAddActor;
@@ -115,16 +115,16 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
 
     public Int32 ServiceEvents()
     {
-        Int32 num = 0;
+        Int32 returnCode = 0;
         if (!this._noEvents)
         {
-            this.eTb.ProcessKeyEvents();
+            ETb.ProcessKeyEvents();
             this.CheckSleep();
-            num = this.ProcessEvents();
+            returnCode = this.ProcessEvents();
             EIcon.ProcessFIcon();
             EIcon.ProcessAIcon();
         }
-        return num;
+        return returnCode;
     }
 
     public Int32 GetFldMapNoAfterChangeDisc()
@@ -577,7 +577,7 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
         this._context.dashinh = 0;
         this._context.twist_a = 0;
         this._context.twist_d = 0;
-        this.eTb.gMesCount = this.gAnimCount = 10;
+        ETb.gMesCount = this.gAnimCount = 10;
         this._noEvents = false;
         this.InitEncount();
         NewThread(0, 0);
@@ -592,11 +592,11 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
         {
             for (Int32 index = 0; index < 4; ++index)
             {
-                Int32 memberIndex = ff9play.CharacterIDToEventId(this.eTb.GetPartyMember(index));
+                Int32 memberIndex = ff9play.CharacterIDToEventId(ETb.GetPartyMember(index));
                 if (memberIndex >= 0)
                     new Actor(this.sSourceObjN - 9 + memberIndex, 0, sizeOfActor);
                 else
-                    new Actor(this.sSourceObjN - 9, this.sSourceObjN + (Int32)this.eTb.GetPartyMember(index), sizeOfActor);
+                    new Actor(this.sSourceObjN - 9, this.sSourceObjN + (Int32)ETb.GetPartyMember(index), sizeOfActor);
             }
             this._context.partyObjTail = this._context.activeObjTail;
         }
@@ -737,8 +737,8 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
     {
         // Order of script objects is Zidane, Vivi, Dagger, Steiner, Freya, Quina, Eiko, Amarant, Beatrix
         // Order of priorities is Zidane, Eiko, Steiner, Vivi, Freya, Amarant, Garnet, Beatrix, others...
-        Byte[] reorderArray1 = new Byte[9]{ 0, 6, 3, 1, 4, 5, 7, 2, 8 };
-        Byte[] reorderArray2 = new Byte[9]{ 0, 3, 7, 2, 4, 5, 1, 6, 8 };
+        Byte[] reorderArray1 = new Byte[9] { 0, 6, 3, 1, 4, 5, 7, 2, 8 };
+        Byte[] reorderArray2 = new Byte[9] { 0, 3, 7, 2, 4, 5, 1, 6, 8 };
         Dictionary<Int32, CharacterId> reorderToChar = new Dictionary<Int32, CharacterId>();
         Int32 charFlags = 0;
         for (Int32 index = 0; index < 4; ++index)
@@ -748,7 +748,7 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
         }
         for (Int32 index = 0; index < 4; ++index)
         {
-            CharacterId memberId = this.eTb.GetPartyMember(index);
+            CharacterId memberId = ETb.GetPartyMember(index);
             Int32 memberIndex = ff9play.CharacterIDToEventId(memberId);
             Boolean shouldHack = false; // https://github.com/Albeoris/Memoria/issues/3
             Boolean eikoAbducted = FF9StateSystem.EventState.IsEikoAbducted;
@@ -965,7 +965,7 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
 
     private static Obj NewThread(Int32 sid, Int32 uid)
     {
-        return new Obj(sid, uid, sizeOfObj, 16) {cid = 2};
+        return new Obj(sid, uid, sizeOfObj, 16) { cid = 2 };
     }
 
     public Int32 GetBattleCharData(Obj obj, Int32 kind)
@@ -979,7 +979,7 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
         {
             BattleUnit btlDataPtr = btl_scrp.FindBattleUnit((UInt16)(1 << index));
             if (btlDataPtr != null)
-                 num = (Int32)btl_scrp.GetCharacterData(btlDataPtr.Data, (UInt32)kind);
+                num = (Int32)btl_scrp.GetCharacterData(btlDataPtr.Data, (UInt32)kind);
         }
 
         return num;
@@ -998,7 +998,7 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
         if (btl == null)
             return;
 
-        btl_scrp.SetCharacterData(btl.Data, (UInt32)kind, (Int32)value);
+        btl_scrp.SetCharacterData(btl, (UInt32)kind, (Int32)value);
     }
 
     public CMD_DATA GetTriggeringCommand(BTL_DATA btl)
@@ -1044,62 +1044,57 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
     {
         if (eventData.Length == 0)
             return this.nil;
-        
+
         using (MemoryStream memoryStream = new MemoryStream(eventData))
         {
             using (BinaryReader binaryReader = new BinaryReader(memoryStream))
             {
                 binaryReader.ReadByte();
                 Byte count = binaryReader.ReadByte();
-                UInt16 num2 = 0;
-                Int32 num3;
-                for (num3 = count; num3 > 0; --num3)
+                for (Int32 i = 0; i < count; ++i)
                 {
                     UInt16 id = (UInt16)binaryReader.ReadInt16();
-                    num2 = (UInt16)binaryReader.ReadInt16();
+                    UInt16 offset = (UInt16)binaryReader.ReadInt16();
                     if (id == tagID)
-                        break;
+                        return 2 + offset;
                 }
-                if (num3 == 0)
-                    return this.nil;
-                
-                return 2 + num2;
+                return this.nil;
             }
         }
     }
 
     public ObjList DisposeObj(Obj obj)
     {
-        ObjList objList1 = null;
-        ObjList objList2 = null;
-        ObjList objList3;
-        for (objList3 = this._context.activeObj; objList3 != null && objList3.obj != obj; objList3 = objList3.next)
-            objList2 = objList3;
+        ObjList nextObj = null;
+        ObjList prevObj = null;
+        ObjList objInActive;
+        for (objInActive = this._context.activeObj; objInActive != null && objInActive.obj != obj; objInActive = objInActive.next)
+            prevObj = objInActive;
         if (obj.cid == 4)
         {
-            FieldMapActorController mapActorController = ((Actor)obj).fieldMapActorController;
+            FieldMapActorController mapActorController = ((Actor)obj)?.fieldMapActorController;
             mapActorController?.UnregisterHonoBehavior(true);
-            FieldMapActor fieldMapActor = ((Actor)obj).fieldMapActor;
+            FieldMapActor fieldMapActor = ((Actor)obj)?.fieldMapActor;
             if (fieldMapActor != null)
             {
                 fieldMapActor.DestroySelfShadow();
                 fieldMapActor.UnregisterHonoBehavior(true);
             }
         }
-        if (objList3 != null)
+        if (objInActive != null)
         {
-            objList1 = objList3.next;
-            if (objList2 != null)
-                objList2.next = objList1;
-            if (this._context.activeObjTail == objList3)
-                this._context.activeObjTail = objList2;
-            objList3.next = this._context.freeObj;
-            this._context.freeObj = objList3;
+            nextObj = objInActive.next;
+            if (prevObj != null)
+                prevObj.next = nextObj;
+            if (this._context.activeObjTail == objInActive)
+                this._context.activeObjTail = prevObj;
+            objInActive.next = this._context.freeObj;
+            this._context.freeObj = objInActive;
             DeallocObj(obj);
-            if (this._context.controlUID == objList3.obj.uid)
+            if (this._context.controlUID == objInActive.obj.uid)
                 this._context.controlUID = 0;
         }
-        return objList1;
+        return nextObj;
     }
 
     private static void DeallocObj(Obj obj)
@@ -1201,7 +1196,7 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
                             startID3 -= 8;
                         if (startID3 > num1)
                         {
-                            Byte num2 = (Byte)(objByUid.getByteFromBuffer(startID3) & 4294967040U);
+                            Byte num2 = (Byte)(objByUid.getByteFromBuffer(startID3) & 0xFFFFFF00u);
                             objByUid.setByteToBuffer(startID3, num2);
                         }
                     }
@@ -1215,10 +1210,12 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
             obj.level = (Byte)(cEventLevelN - 1);
         }
         else
+        {
             obj.ip = this.nil;
+        }
         if (!obj.isAdditionCommand)
             return;
-        obj.RetunCall();
+        obj.ReturnCall();
     }
 
     public void SetFollow(Obj obj, Int32 winnum, Int32 flags)

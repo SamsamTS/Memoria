@@ -1,7 +1,7 @@
+using Memoria.Test;
 using System;
 using System.ComponentModel;
 using System.Text;
-using Memoria.Test;
 
 namespace Memoria.Client
 {
@@ -24,7 +24,7 @@ namespace Memoria.Client
                 {
                     Native.Text = value;
                     IReferenceMessage valueMessage = new StringMessage(value);
-                    SendPropertyChanged(nameof(UILabel.text), valueMessage);
+                    SendPropertyChanged(nameof(UILabel.rawText), valueMessage);
                     RaisePropertyChanged(nameof(Title));
                 }
             }

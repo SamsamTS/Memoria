@@ -1,13 +1,13 @@
-using System;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Threading;
 using AOT;
 using FF9;
 using Memoria;
 using Memoria.Data;
 using Memoria.Prime;
+using System;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Threading;
 using UnityEngine;
 
 public static class SFX
@@ -559,7 +559,7 @@ public static class SFX
         SFX.isDebugLine = false;
         SFX.isDebugCam = false;
         SFX.isDebugMode = false;
-        SFX.isDebugFillter = true;
+        SFX.isDebugFilter = true;
         SFX.isDebugMeshIndex = 0;
         SFX.isRunning = false;
         SFX.currentEffectID = SpecialEffect.Special_No_Effect;
@@ -575,7 +575,7 @@ public static class SFX
     }
 
     public static Boolean IsRunning()
-	{
+    {
         if (Configuration.Battle.SFXRework)
             return UnifiedBattleSequencer.runningActions.Count > 0;
         return SFX.isRunning;
@@ -880,17 +880,17 @@ public static class SFX
                 FF9StateSystem.EventState.gEventGlobal[199] |= 16;
                 return 0;
             case 113: // Display Ability Casting Name
-                {
-                    CMD_DATA curCmdPtr = btl_util.getCurCmdPtr();
-                    if (curCmdPtr != null)
-                        UIManager.Battle.SetBattleCommandTitle(curCmdPtr);
-                    return 0;
-                }
+            {
+                CMD_DATA curCmdPtr = btl_util.getCurCmdPtr();
+                if (curCmdPtr != null)
+                    UIManager.Battle.SetBattleCommandTitle(curCmdPtr);
+                return 0;
+            }
             case 114: // Show/Hide Cursor
                 if (arg0 != 0)
                     FF9StateSystem.Battle.FF9Battle.cmd_status |= 2;
                 else
-                    FF9StateSystem.Battle.FF9Battle.cmd_status &= 65533;
+                    FF9StateSystem.Battle.FF9Battle.cmd_status &= 0xFFFD;
                 return 0;
             case 115: // Is Cursor Shown
                 return ((FF9StateSystem.Battle.FF9Battle.cmd_status & 2) == 0) ? 0 : 1;
@@ -908,18 +908,18 @@ public static class SFX
                         vib.VIB_purge();
                         break;
                     case 1: // Vibrate (full parameters)
-                        {
-                            Byte[] array = new Byte[1800];
-                            Marshal.Copy((IntPtr)p, array, 0, 1800);
-                            MemoryStream input = new MemoryStream(array);
-                            BinaryReader binaryReader = new BinaryReader(input);
-                            vib.VIB_init(binaryReader);
-                            vib.VIB_setTrackActive(0, vib.VIB_SAMPLE_LO, true);
-                            vib.VIB_setTrackActive(0, vib.VIB_SAMPLE_HI, true);
-                            vib.VIB_vibrate(1);
-                            binaryReader.Close();
-                            break;
-                        }
+                    {
+                        Byte[] array = new Byte[1800];
+                        Marshal.Copy((IntPtr)p, array, 0, 1800);
+                        MemoryStream input = new MemoryStream(array);
+                        BinaryReader binaryReader = new BinaryReader(input);
+                        vib.VIB_init(binaryReader);
+                        vib.VIB_setTrackActive(0, vib.VIB_SAMPLE_LO, true);
+                        vib.VIB_setTrackActive(0, vib.VIB_SAMPLE_HI, true);
+                        vib.VIB_vibrate(1);
+                        binaryReader.Close();
+                        break;
+                    }
                     case 2: // Vibrate
                         vib.VIB_setActive(false);
                         vib.VIB_setTrackActive(1, vib.VIB_SAMPLE_LO, true);
@@ -942,13 +942,13 @@ public static class SFX
             case 122: // Back Attack, Preemptive, Normal
                 return (Byte)FF9StateSystem.Battle.FF9Battle.btl_scene.Info.StartType;
             case 123: // Return the number of targetable player characters
-                {
-                    Int32 validPlayerTarget = 0;
-                    for (BTL_DATA next = FF9StateSystem.Battle.FF9Battle.btl_list.next; next != null; next = next.next)
-                        if (next.bi.player != 0 && !Status.checkCurStat(next, BattleStatus.Death | BattleStatus.Jump))
-                            validPlayerTarget++;
-                    return validPlayerTarget;
-                }
+            {
+                Int32 validPlayerTarget = 0;
+                for (BTL_DATA next = FF9StateSystem.Battle.FF9Battle.btl_list.next; next != null; next = next.next)
+                    if (next.bi.player != 0 && !btl_stat.CheckStatus(next, BattleStatus.Death | BattleStatus.Jump))
+                        validPlayerTarget++;
+                return validPlayerTarget;
+            }
             case 124: // Return the current battle camera index (these cameras are predefined per btlseq)
                 return FF9StateSystem.Battle.FF9Battle.seq_work_set.CameraNo;
             case 125: // Set Sound Pitch (default is 4 for a pitch of 1f)
@@ -1049,6 +1049,14 @@ public static class SFX
                 *(Int32*)((Byte*)p + 8) = (Int32)(next.gameObject.transform.localScale.z * 4096f);
                 break;
             case 6: // Set Size
+                if (SFX.FixScaleReset())
+                {
+                    // TODO: This fix doesn't seem to work everytime for some reason, it looks random
+                    // A bug makes some enemies (Nova Dragon, Jabberwocky, ...) disappear or be kept very small after the cast of Atomos in mode "SFXRework = 0"
+                    geo.geoScaleReset(next);
+                    next.gameObject.transform.localScale = Vector3.one;
+                    break;
+                }
                 if ((arg0 & 128) == 0)
                     geo.geoScaleReset(next);
                 else
@@ -1099,9 +1107,9 @@ public static class SFX
                         {
                             if (arg0 == (Byte)BattlePlayerCharacter.PlayerMotionIndex.MP_IDLE_TO_CHANT)
                                 btl_mot.setMotion(next, "ANH_MAIN_B0_011_110");
-                            if (arg0 == (Byte)BattlePlayerCharacter.PlayerMotionIndex.MP_CHANT)
+                            else if (arg0 == (Byte)BattlePlayerCharacter.PlayerMotionIndex.MP_CHANT)
                                 btl_mot.setMotion(next, "ANH_MAIN_B0_011_111");
-                            if (arg0 == (Byte)BattlePlayerCharacter.PlayerMotionIndex.MP_MAGIC)
+                            else if (arg0 == (Byte)BattlePlayerCharacter.PlayerMotionIndex.MP_MAGIC)
                                 btl_mot.setMotion(next, "ANH_MAIN_B0_011_112");
                             next.animFlag |= (UInt16)EventEngine.afLoop;
                             next.evt.animFrame = 0;
@@ -1114,7 +1122,8 @@ public static class SFX
                         break;
                     }
                     btl_mot.setMotion(next, (Byte)arg0);
-                    next.animFlag |= (UInt16)EventEngine.afLoop;
+                    if (SFX.currentEffectID != SpecialEffect.Tidal_Wave) // Fix #1029
+                        next.animFlag |= (UInt16)EventEngine.afLoop;
                     next.evt.animFrame = 0;
                 }
                 break;
@@ -1126,7 +1135,7 @@ public static class SFX
                 //  + reset the BBG transparency at the end ("Set battle scene transparency 255 5" in Hades Workshop)
                 //  + make sure that all the characters are shown at the end (removing all the lines "Show/hide characters" in Hades Workshop has a good-looking result)
                 // Also, the caster moves away when using SFX 384 (Ultima in Crystal World), so either reset the caster's position at the end of the sequencing or use the Pandemonium version
-                if ((SFX.currentEffectID == SpecialEffect.Special_Ultima_Terra || SFX.currentEffectID == SpecialEffect.Special_Ultima_Memoria) && FF9StateSystem.Battle.FF9Battle.btl_phase == 4)
+                if ((SFX.currentEffectID == SpecialEffect.Special_Ultima_Terra || SFX.currentEffectID == SpecialEffect.Special_Ultima_Memoria) && FF9StateSystem.Battle.FF9Battle.btl_phase == FF9StateBattleSystem.PHASE_NORMAL)
                     return next.bi.stop_anim;
                 Byte stop_anim = next.bi.stop_anim;
                 next.bi.stop_anim = (Byte)arg0;
@@ -1221,7 +1230,7 @@ public static class SFX
                         return btl_stat.CheckStatus(next, status) ? 1 : 0;
                     }
                     case 2: // Remove many statuses
-                        btl_stat.RemoveStatuses(next, ~(BattleStatus.EasyKill | BattleStatus.Death | BattleStatus.LowHP | BattleStatus.Stop));
+                        btl_stat.RemoveStatuses(new BattleUnit(next), ~(BattleStatus.EasyKill | BattleStatus.Death | BattleStatus.LowHP | BattleStatus.Stop | BattleStatus.ChangeStat));
                         break;
                     case 3: // Reset Statuses
                         btl_stat.InitStatus(next);
@@ -1315,9 +1324,9 @@ public static class SFX
                 break;
             case 31: // Play Weapon Sound (see FF9Snd.ff9battleSoundWeaponSndEffect02, second entry)
                 if (btl_util.getCurCmdPtr() != null)
-				{
+                {
                     BattleUnit targ = btl_scrp.FindBattleUnit(btl_util.getCurCmdPtr().tar_id);
-                    if (targ != null && (targ.Data.fig_info & Param.FIG_INFO_MISS) != 0)
+                    if (targ != null && (targ.Data.fig.info & Param.FIG_INFO_MISS) != 0)
                         break;
                 }
                 btlsnd.ff9btlsnd_sndeffect_play(btlsnd.ff9btlsnd_weapon_sfx(next.bi.line_no, FF9BatteSoundWeaponSndEffectType.FF9BTLSND_WEAPONSNDEFFECTTYPE_HIT), 0, 127, 128);
@@ -1362,6 +1371,12 @@ public static class SFX
             }
         }
         return 0;
+    }
+
+    private static Boolean FixScaleReset()
+    {
+        return SFX.currentEffectID == SpecialEffect.Atomos__Full && SFX.frameIndex > 350 // Frame 368
+            || SFX.currentEffectID == SpecialEffect.Atomos__Short && SFX.frameIndex > 150; // Frame 188
     }
 
     public static void CreateEffectDebugData()
@@ -1583,7 +1598,7 @@ public static class SFX
             Camera camera = Camera.main ? Camera.main : GameObject.Find("Battle Camera").GetComponent<BattleMapCameraController>().GetComponent<Camera>();
             SFX.fxNearZ = array[12];
             SFX.fxFarZ = 65535f;
-            camera.nearClipPlane = SFX.fxNearZ;
+            camera.nearClipPlane = 0.1f; //SFX.fxNearZ (fix most clipping issues in battle)
             camera.farClipPlane = SFX.fxFarZ;
             camera.worldToCameraMatrix = PsxCamera.PsxMatrix2UnityMatrix(array, SFX.cameraOffset);
             camera.projectionMatrix = PsxCamera.PsxProj2UnityProj(SFX.fxNearZ, SFX.fxFarZ);
@@ -1596,9 +1611,9 @@ public static class SFX
                 if ((fF9Battle.btl_load_status & ff9btl.LOAD_ALL) == ff9btl.LOAD_ALL)
                 {
                     if (fF9Battle.btl_scene.Info.SpecialStart && !FF9StateSystem.Battle.isDebug)
-                        fF9Battle.btl_phase = 1;
+                        fF9Battle.btl_phase = FF9StateBattleSystem.PHASE_EVENT;
                     else
-                        fF9Battle.btl_phase = 3;
+                        fF9Battle.btl_phase = FF9StateBattleSystem.PHASE_MENU_ON;
                     SFX.InitBattleParty();
                     SFX.SetCameraPhase(0);
                 }
@@ -1921,24 +1936,27 @@ public static class SFX
 
     public static void Play(SpecialEffect effNum)
     {
+        if ((Int32)effNum >= SFX.playParam.Length)
+            effNum = SpecialEffect.Fire__Multi;
         SFX.currentEffectID = effNum;
         SFX.streamIndex = 0;
         SFX.soundFPS = 4;
         SFX.soundCallCount = 0;
         SFX.cameraOffset = 0f;
-        Int32 num = SFX.playParam[(Int32)effNum] & 3;
-        if (num == 0)
+        Int32 param = SFX.playParam[(Int32)effNum];
+        Int32 shaderSubOrder = param & 3;
+        if (shaderSubOrder == 0)
             SFX.subOrder = SFX.defaultSubOrder;
         else
-            SFX.subOrder = num - 1;
-        Int32 num2 = SFX.playParam[(Int32)effNum] >> 2 & 3;
-        if (num2 == 0)
+            SFX.subOrder = shaderSubOrder - 1;
+        Int32 colorStrength = param >> 2 & 3;
+        if (colorStrength == 0)
             SFX.colIntensity = SFX.defaultColIntensity;
         else
-            SFX.colIntensity = num2 - 1;
+            SFX.colIntensity = colorStrength - 1;
         SFX.pixelOffset = 0;
-        SFX.colThreshold = (SFX.playParam[(Int32)effNum] >> 29 & 1);
-        SFX.addOrder = (SFX.playParam[(Int32)effNum] >> 28 & 1);
+        SFX.colThreshold = param >> 29 & 1;
+        SFX.addOrder = param >> 28 & 1;
         SFX.SoundClear();
         SFX.isRunning = true;
         SFX.frameIndex = 0;
@@ -1947,26 +1965,25 @@ public static class SFX
             SFX.lastPlayedExeId = SFX.request.exe.btl_id;
         PSXTextureMgr.Reset();
         SFXMesh.DetectEyeFrameStart = -1;
-        Int32 num3 = Marshal.SizeOf(SFX.request);
-        Byte[] value = new Byte[num3];
-        GCHandle gCHandle = GCHandle.Alloc(value, GCHandleType.Pinned);
-        Marshal.StructureToPtr(SFX.request, gCHandle.AddrOfPinnedObject(), false);
+        Byte[] requestRaw = new Byte[Marshal.SizeOf(SFX.request)];
+        GCHandle requestHandle = GCHandle.Alloc(requestRaw, GCHandleType.Pinned);
+        Marshal.StructureToPtr(SFX.request, requestHandle.AddrOfPinnedObject(), false);
         SoundLib.LoadSfxSoundData((Int32)effNum);
         if (effNum == SpecialEffect.Special_Necron_Death)
             PSXTextureMgr.SpEff435();
-        String path = "SpecialEffects/ef" + ((Int32)effNum).ToString("D3");
+        String path = $"SpecialEffects/ef{(Int32)effNum:D3}";
         Byte[] binAsset = AssetManager.LoadBytes(path, true);
         if (binAsset != null)
         {
-            GCHandle gCHandle2 = GCHandle.Alloc(binAsset, GCHandleType.Pinned);
-            SFX.SFX_Play((Int32)effNum, gCHandle2.AddrOfPinnedObject(), binAsset.Length, gCHandle.AddrOfPinnedObject());
-            gCHandle2.Free();
+            GCHandle binHandle = GCHandle.Alloc(binAsset, GCHandleType.Pinned);
+            SFX.SFX_Play((Int32)effNum, binHandle.AddrOfPinnedObject(), binAsset.Length, requestHandle.AddrOfPinnedObject());
+            binHandle.Free();
         }
         else
         {
-            SFX.SFX_Play((Int32)effNum, (IntPtr)null, 0, gCHandle.AddrOfPinnedObject());
+            SFX.SFX_Play((Int32)effNum, (IntPtr)null, 0, requestHandle.AddrOfPinnedObject());
         }
-        gCHandle.Free();
+        requestHandle.Free();
     }
 
     public static void SetCameraTarget(Vector3 pos, BTL_DATA exe, BTL_DATA trg)
@@ -2001,8 +2018,8 @@ public static class SFX
                 case 163: // Shell Dragon (YANA)
                     arg = 120;
                     break;
-                //case 161: // Carve Spider + Axe Beak (World Map)
-                //case 162: // Carve Spider + Axe Beak (World Map)
+                    //case 161: // Carve Spider + Axe Beak (World Map)
+                    //case 162: // Carve Spider + Axe Beak (World Map)
             }
         }
         SFXDataCamera.currentCameraEngine = SFXDataCamera.CameraEngine.SFX_PLUGIN;
@@ -2026,8 +2043,8 @@ public static class SFX
             case 302: // Prison Cage (Garnet)
                 arg = 150;
                 break;
-            //case 300: // Antlion (Cleyra)
-            //case 301: // Prison Cage (Vivi)
+                //case 300: // Antlion (Cleyra)
+                //case 301: // Prison Cage (Vivi)
         }
         SFXDataCamera.currentCameraEngine = SFXDataCamera.CameraEngine.SFX_PLUGIN;
         SFX.SFX_SendIntData(4, btl.btl_id, arg, 0);
@@ -2082,7 +2099,7 @@ public static class SFX
     }
 
     public static Int32 AdjustSoundIndex(Int32 dno, Int32 sce, out Boolean shouldSkip)
-	{
+    {
         dno += 12;
         shouldSkip = false;
         if (sce != 0)
@@ -2293,10 +2310,10 @@ public static class SFX
             return true;
         if (FF9StateSystem.Settings.cfg.camera == 1UL || Comn.random8() >= 128)
             return false;
-        BattleStatus pStat = cmd.regist.stat.cur | cmd.regist.stat.permanent;
+        BattleStatus pStat = cmd.regist.stat.CurrentIncludeOnHold;
         for (BTL_DATA next = FF9StateSystem.Battle.FF9Battle.btl_list.next; next != null; next = next.next)
             if ((next.btl_id & cmd.tar_id) != 0)
-                pStat |= next.stat.cur | next.stat.permanent;
+                pStat |= next.stat.CurrentIncludeOnHold;
         return (pStat & BattleStatusConst.PreventAlternateCamera) == 0u;
     }
 
@@ -2410,7 +2427,7 @@ public static class SFX
 
     public static Boolean isDebugMode;
 
-    public static Boolean isDebugFillter;
+    public static Boolean isDebugFilter;
 
     public static Int32 isDebugMeshIndex;
 

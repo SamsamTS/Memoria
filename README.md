@@ -1,81 +1,65 @@
-# Memoria 
-    Final Fantasy IX Engine
+![memoria-logo.jpg](https://github.com/user-attachments/assets/625396cc-7553-4607-9626-9f98917d6073)
 
-## Overview
+### The Memoria engine is an open-source community rewrite of Final Fantasy IX's engine that aims to add features, fix bugs and expand modding possibilities. It includes built-in improvements (QoL, camera, framerate, audio, controller, UI, options, cheats, shaders...), bugfixes, a mod manager/downloader and a model viewer. [More info here](https://github.com/Albeoris/Memoria/wiki/Project-Overview)
 
-Memoria Engine (for Final Fantasy IX's Steam version) is a C# rewrite of the game's engine, maintaining compatibility with original game components and data. Its main aim is to aid mod makers in developing mods, expanding content, localizing the game, and fixing bugs. Memoria fixes existing game bugs and includes built-in improvements (camera, framerate, audio, controller, UI, options, cheats...) while supporting third-party mods. You need to own the game on Steam to run it. [More info here](https://github.com/Albeoris/Memoria/wiki/Project-Overview)
+Note: This is **not** affiliated with the Memoria Project, a 2023 Proof-of-concept tribute render in Unreal Engine
 
 ## Features
 
-- New launcher with easy options (for not included options: Memoria.ini)
-- Mod Manager, with integrated community catalog and 1 click install
-- Smooth camera movement, texture scrolling...
-- Optional features:
-    - Battle UI layouts (includes original PSX layout)
-    - Highter framerate (60fps+)
-    - Camera stabilizer (configurable)
-    - Font change (includes original PSX font)
-    - Volume control
-    - Anti-aliasing
-    - Full analog movement and controller support
-- Support for:
-    - Larger backgrounds definition (e.g. Moguri)
-    - Widescreen (16:9 or 16:10)
-    - Unlocks FMV framerate change (e.g. Moguri)
+- Main features:
+    - Easy to use, everything optional, main settings in the launcher, the rest in Memoria.ini
+    - **Mod Manager/downloader**, using individual mod folders
+    - **Widescreen (for all resolutions)**
+    - **Higher framerate (60fps+)**
+    - **Smooth and stabilized camera movement**
+    - **Improved rendering**: Anti-aliasing, texture filtering, layer edges, shaders
+    - **Triple Triad** / Tetra Triad option
+    - Better **sound engine**, volume control
+    - **Many, many bugfixes**
+- UI
+    - **Font change (includes the original PSX font)**
+    - **Battle speed change & Swirl skip**
+    - **Turn-based mode / Simultaneous mode**
+    - **Controller support with full analog movement**
+    - **Battle UI layouts (includes original PSX layout)**
+    - More items displayed at once
+    - PSX disc change screens
+    - Model Viewer
+- Modding support for:
+    - UI, backgrounds, shaders, texture, FMV modding/upscale (e.g. Moguri)
     - Voice acting (e.g. WIP project ECHO-S)
-    - Many limitations removed for mods
-    - Some bugfixes
-- Faster battles:
-    - Speed change
-    - Swirl duration / skip
-    - Turn-based mode / Waiting skip mode / Simultaneous attacks mode
+    - Translations
+    - Expanded features for mods
+    - Moddable game data (StreamingAssets\Data\) and abilities (StreamingAssets\Scripts\)
+    - More character playable mods (e.g. Playable character pack, Tantalus...)
+    - Import/export text/audio/textures
 - Optional Cheats:
-    - Stealing 100% success
+    - **Stealing 100% success**
     - Enable/Disable vanilla cheats
-    - Easy minigames (rope, frogs, racing)
+    - Easy minigames (rope, frogs, racing...)
     - Excalibur II time limit removal
-- Tetra Master (Card game):
-    - (Option) replace with a custom version of Triple Triad (FFVIII) or Tetra Master/Triple Triad hybrid
-    - Raise card limit
-    - Auto discard cards
-    - Ways to tweak the randomness
-- Include individual mod assets in folders
-- Edit game data (look at the "StreamingAssets\Data" folder)
-- Change ability mechanics (look at the "StreamingAssets\Scripts" folder)
-- Make every character available (Alt+F2)
-- Export/import text/audio resources (Ctrl+Alt+Shift+S to debug)
+    - Cards: lower randomness, card limit raised, auto discard cards
+    - Manual Trance
+ 
+![screenshots.jpg](https://github.com/user-attachments/assets/2bacaa4c-c380-44a8-bc67-9814594154d0)
 
+## Use
 
-## Install
+- **INSTALL**
+  - (Windows): Download and run [Memoria.Patcher.exe](https://github.com/Albeoris/Memoria/releases/latest/download/Memoria.Patcher.exe)
+    - Automatically finds the game path from Windows registry (if you've launched the game once and haven't moved the install folder) (If not, launch the patcher from the game folder, or provide a custom path in command line: 'Memoria.Patcher.exe "gameDirectory"')
+  - (Steam Deck / Linux) run this in the Konsole/terminal:
+  - `bash -c "$(curl -sL https://gist.githubusercontent.com/dotaxis/1ad1c64baa7ad9c1dabcb255ea6257ae/raw/memoria.sh)"`
+  - (Mac): The launcher has been shown to be currently only compatible with Crossover in Windows 7 32bit mode (Whiskey and 64bit give an error "mono-io-layer-error")
+- **UPDATE**
+  - Run the latest patcher exe or use "check for updates" in the launcher
+  - The Mod Manager will show a yellow dot if some of your mods are not up-to-date
+- **CONFIGURE**
+  - Most crucial options and cheats are embedded in the game launcher
+  - More in-depth configuration is available in the file Memoria.ini (in the game folder)
 
-- Download and run [Memoria.Patcher.exe](https://github.com/Albeoris/Memoria/releases/)
+## Documentation
 
-    > Automatically finds the game path from Windows registry or current directory, you can provide a custom path as argument:
-    > Memoria.Patcher.exe gameDirectory
-- Note: if you want Moguri Mod, use Memoria patcher after.
-
-
-## Update
-
-- Update the game to the **latest** version.
-- Patch with the latest [Memoria.Patcher.exe](https://github.com/Albeoris/Memoria/releases/)
-
-
-## Debug (for users)
-
-- After first running the game, you should see "Memoria.ini" in the game directory.
-- If something went wrong, there will be errors in "Memoria.log".
-- If you can't see "Memoria.log", try running the game with administrator rights.
-- "Sharing violation on path" error: close applications holding the file.
-- "at Memoria.CsvReader.Read" error: delete files in (game)\StreamingAssets\Data and patch again.
-- "at Memoria.ScriptsLoader.Initialize" error: delete files in (game)\StreamingAssets\Scripts and patch again.
-- If an error persists, check "\FINAL FANTASY IX\x64(or x86)\FF9_Data\output_log.txt".
-
-## DEVELOPERS
-
-[INFO for developers](https://github.com/Albeoris/Memoria/wiki/Developer-instructions)
-
-
-## Knowledge base
-
-Please [visit our knowledge base](../../wiki#knowledge-base) before using this software.
+- [Info for developers](../../wiki#Developers)
+- [Knowledge base](../../wiki#knowledge-base)
+- [Memoria.ini](../../wiki/Memoria.ini-sections)

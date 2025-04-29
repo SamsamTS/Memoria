@@ -3,13 +3,14 @@ using Assets.Sources.Scripts.UI.Common;
 using FF9;
 using Memoria;
 using Memoria.Data;
-using Memoria.Database;
 using Memoria.Prime;
+using Memoria.Scripts;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 #pragma warning disable 169
 #pragma warning disable 414
@@ -90,59 +91,75 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
 
     protected override void Awake()
     {
-        base.Awake();
-        FPSManager.SetTargetFPS(Configuration.Graphics.BattleFPS);
-        FPSManager.SetMainLoopSpeed(Configuration.Graphics.BattleTPS);
-        this.playerMaterials = new List<Material>();
-        this.monsterMaterials = new List<Material>();
-        FF9StateSystem.Battle.isFade = false;
-        this.animationName = new String[8];
-        this.needClampTime = false;
-        if (Application.platform == RuntimePlatform.Android)
+        try
         {
-            String deviceModel = SystemInfo.deviceModel;
-            if (String.Compare("Asus Nexus Player", deviceModel, true) == 0)
-                this.needClampTime = true;
+            base.Awake();
+            FPSManager.SetTargetFPS(Configuration.Graphics.BattleFPS);
+            FPSManager.SetMainLoopSpeed(Configuration.Graphics.BattleTPS);
+            this.playerMaterials = new List<Material>();
+            this.monsterMaterials = new List<Material>();
+            FF9StateSystem.Battle.isFade = false;
+            this.animationName = new String[8];
+            this.needClampTime = false;
+            if (Application.platform == RuntimePlatform.Android)
+            {
+                String deviceModel = SystemInfo.deviceModel;
+                if (String.Compare("Asus Nexus Player", deviceModel, true) == 0)
+                    this.needClampTime = true;
+            }
+            FF9StateSystem instance = PersistenSingleton<FF9StateSystem>.Instance;
+            FF9StateSystem.Battle.FF9Battle.map.nextMode = instance.prevMode;
+            if (instance.prevMode == 1)
+            {
+                FF9StateSystem.Battle.FF9Battle.map.nextMapNo = FF9StateSystem.Common.FF9.fldMapNo;
+            }
+            else
+            {
+                if (instance.prevMode != 3)
+                    return;
+                FF9StateSystem.Battle.FF9Battle.map.nextMapNo = FF9StateSystem.Common.FF9.wldMapNo;
+            }
         }
-        FF9StateSystem instance = PersistenSingleton<FF9StateSystem>.Instance;
-        FF9StateSystem.Battle.FF9Battle.map.nextMode = instance.prevMode;
-        if (instance.prevMode == 1)
+        catch (Exception err)
         {
-            FF9StateSystem.Battle.FF9Battle.map.nextMapNo = FF9StateSystem.Common.FF9.fldMapNo;
-        }
-        else
-        {
-            if (instance.prevMode != 3)
-                return;
-            FF9StateSystem.Battle.FF9Battle.map.nextMapNo = FF9StateSystem.Common.FF9.wldMapNo;
+            Log.Error(err);
         }
     }
 
     private void Start()
     {
-        this.cameraController = GameObject.Find("Battle Camera").GetComponent<BattleMapCameraController>();
-        this.InitBattleScene();
-        FPSManager.SetTargetFPS(Configuration.Graphics.BattleFPS);
-        FPSManager.SetMainLoopSpeed(Configuration.Graphics.BattleTPS);
-        GameObject gameObject1 = GameObject.Find("BattleMap Root");
-        GameObject gameObject2 = new GameObject("BattleMap SPS");
-        gameObject2.transform.parent = gameObject1.transform;
-        battleSPS = gameObject2.AddComponent<BattleSPSSystem>();
-        battleSPS.Init();
-        Byte num = FF9StateSystem.Battle.FF9Battle.btl_scene.PatAddr[FF9StateSystem.Battle.FF9Battle.btl_scene.PatNum].Camera;
-        FF9StateSystem.Battle.FF9Battle.seq_work_set.CameraNo = (Int32)num >= 3 ? (Byte)UnityEngine.Random.Range(0, 3) : num;
-        SFX.StartBattle();
-        BattleVoice.InitBattle();
+        try
+        {
+            this.cameraController = GameObject.Find("Battle Camera").GetComponent<BattleMapCameraController>();
+            this.InitBattleScene();
+            FPSManager.SetTargetFPS(Configuration.Graphics.BattleFPS);
+            FPSManager.SetMainLoopSpeed(Configuration.Graphics.BattleTPS);
+            GameObject battleMapGo = GameObject.Find("BattleMap Root");
+            GameObject spsSystemGo = new GameObject("BattleMap SPS");
+            spsSystemGo.transform.parent = battleMapGo.transform;
+            if (battleSPS == null)
+                battleSPS = spsSystemGo.AddComponent<BattleSPSSystem>();
+            battleSPS.Init();
+            Byte cameraNo = FF9StateSystem.Battle.FF9Battle.btl_scene.PatAddr[FF9StateSystem.Battle.FF9Battle.btl_scene.PatNum].Camera;
+            FF9StateSystem.Battle.FF9Battle.seq_work_set.CameraNo = cameraNo >= 3 ? (Byte)UnityEngine.Random.Range(0, 3) : cameraNo;
+            SFX.StartBattle();
+            BattleVoice.InitBattle();
+            SmoothFrameUpdater_Battle.OnBattleMapChange();
 
-        if ((Int64)FF9StateSystem.Settings.cfg.skip_btl_camera == 0L && FF9StateSystem.Battle.isRandomEncounter)
-            SFX.SkipCameraAnimation(-1);
+            if ((Int64)FF9StateSystem.Settings.cfg.skip_btl_camera == 0L && FF9StateSystem.Battle.isRandomEncounter)
+                SFX.SkipCameraAnimation(-1);
 
-        if (!FF9StateSystem.Battle.isNoBoosterMap())
-            return;
+            if (!FF9StateSystem.Battle.isNoBoosterMap())
+                return;
 
-        FF9StateSystem.Settings.IsBoosterButtonActive[0] = false;
-        FF9StateSystem.Settings.SetBoosterHudToCurrentState();
-        PersistenSingleton<UIManager>.Instance.Booster.SetBoosterButton(BoosterType.BattleAssistance, false);
+            FF9StateSystem.Settings.IsBoosterButtonActive[0] = false;
+            FF9StateSystem.Settings.SetBoosterHudToCurrentState();
+            PersistenSingleton<UIManager>.Instance.Booster.SetBoosterButton(BoosterType.BattleAssistance, false);
+        }
+        catch (Exception err)
+        {
+            Log.Error(err);
+        }
     }
 
     public void InitBattleScene()
@@ -153,6 +170,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         this.btlScene = FF9StateSystem.Battle.FF9Battle.btl_scene = new BTL_SCENE();
         Debug.Log("battleID = " + FF9StateSystem.Battle.battleMapIndex);
 
+        battlebg.CreateBattleRoot();
         FF9BattleDB.SceneData.TryGetKey(FF9StateSystem.Battle.battleMapIndex, out battleSceneName);
         battleSceneName = battleSceneName.Substring(4);
         Debug.Log("battleSceneName = " + battleSceneName);
@@ -173,15 +191,9 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
             FF9StateBattleMap ff9StateBattleMap = FF9StateSystem.Battle.FF9Battle.map;
             ff9StateBattleMap.evtPtr = EventEngineUtils.loadEventData(ebFileName, "Battle/");
             PersistenSingleton<EventEngine>.Instance.StartEvents(ff9StateBattleMap.evtPtr);
-            PersistenSingleton<EventEngine>.Instance.eTb.InitMessage();
+            ETb.InitMessage();
         }
         this.CreateBattleData(FF9);
-        if (battleSceneName == "EF_E006" || battleSceneName == "EF_E007")
-        {
-            BTL_DATA prisonCage = FF9StateSystem.Battle.FF9Battle.btl_data[4];
-            BTL_DATA prisoner = FF9StateSystem.Battle.FF9Battle.btl_data[5];
-            SetupAttachModel(prisonCage, prisoner, 55, 100);
-        }
         FF9StateBattleSystem stateBattleSystem = FF9StateSystem.Battle.FF9Battle;
         GEOTEXHEADER geotexheader = new GEOTEXHEADER();
         geotexheader.ReadBGTextureAnim(battleModelPath);
@@ -210,42 +222,37 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         playerEnterCommand = false;
         this.playerCastingSkill = false;
         this.enemyEnterCommand = false;
+        
+        
+        if (Configuration.Shaders.CustomShaderEnabled == 1 && _updateAmbientRoutine == null)
+        {
+            _updateAmbientRoutine = this.StartCoroutine(UpdateAmbientLight());
+        }
     }
 
     private void CreateBattleData(FF9StateGlobal FF9)
     {
-        BTL_DATA[] btlDataArray = btlseq.instance.btl_list = FF9StateSystem.Battle.FF9Battle.btl_data;
+        BTL_DATA[] btl = btlseq.instance.btl_list = FF9StateSystem.Battle.FF9Battle.btl_data;
         Int32 pindex = 0;
         for (Int32 i = 0; i < 4; ++i)
         {
-            btlDataArray[i] = new BTL_DATA();
+            btl[i] = new BTL_DATA();
+            btl[i].typeNo = Byte.MaxValue;
+            btl[i].weaponModels.Clear();
             if (FF9.party.member[i] != null)
             {
-                BattlePlayerCharacter.CreatePlayer(btlDataArray[pindex], FF9.party.member[i].info.serial_no);
+                BattlePlayerCharacter.CreatePlayer(btl[pindex], FF9.party.member[i]);
                 Int32 meshCount = 0;
-                IEnumerator enumerator = btlDataArray[pindex].gameObject.transform.GetEnumerator();
-                try
-                {
-                    while (enumerator.MoveNext())
-                    {
-                        if ((enumerator.Current as UnityEngine.Object)?.name.Contains("mesh") == true)
-                            ++meshCount;
-                    }
-                }
-                finally
-                {
-                    IDisposable disposable = enumerator as IDisposable;
-                    disposable?.Dispose();
-                }
-                btlDataArray[pindex].meshIsRendering = new Boolean[meshCount];
+                foreach (Transform transform in btl[pindex].gameObject.transform)
+                    if (transform.name.Contains("mesh"))
+                        meshCount++;
+                btl[pindex].meshCount = meshCount;
+                btl[pindex].meshIsRendering = new Boolean[meshCount];
                 for (Int32 j = 0; j < meshCount; ++j)
-                    btlDataArray[pindex].meshIsRendering[j] = true;
-                btlDataArray[pindex].meshCount = meshCount;
-                btlDataArray[pindex].animation = btlDataArray[pindex].gameObject.GetComponent<Animation>();
+                    btl[pindex].meshIsRendering[j] = true;
+                btl[pindex].animation = btl[pindex].gameObject.GetComponent<Animation>();
                 ++pindex;
             }
-            btlDataArray[i].typeNo = 5;
-            btlDataArray[i].idleAnimationName = this.animationName[i];
         }
         for (Int32 i = 4; i < 4 + this.btlScene.PatAddr[FF9StateSystem.Battle.FF9Battle.btl_scene.PatNum].MonsterCount; ++i)
         {
@@ -254,54 +261,94 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
             SB2_MON_PARM sb2MonParm = this.btlScene.MonAddr[monType];
             String path = FF9BattleDB.GEO.GetValue(sb2MonParm.Geo);
             //var vector3 = new Vector3(sb2Pattern.Put[index2 - 4].Xpos, sb2Pattern.Put[index2 - 4].Ypos * -1, sb2Pattern.Put[index2 - 4].Zpos);
-            btlDataArray[i] = new BTL_DATA { gameObject = ModelFactory.CreateModel(path, true) };
-            if (!String.IsNullOrEmpty(sb2MonParm.WeaponModel))
+            btl[i] = new BTL_DATA { gameObject = ModelFactory.CreateModel(path, true, true, Configuration.Graphics.ElementsSmoothTexture) };
+            btl[i].typeNo = monType;
+            btl[i].weaponModels.Clear();
+            if (sb2MonParm.TextureFiles != null)
+                ModelFactory.ChangeModelTexture(btl[i].gameObject, sb2MonParm.TextureFiles);
+            if (sb2MonParm.WeaponAttachment != null)
             {
-                btlDataArray[i].weapon_geo = ModelFactory.CreateModel("BattleMap/BattleModel/battle_weapon/" + sb2MonParm.WeaponModel + "/" + sb2MonParm.WeaponModel, true);
-                MeshRenderer[] componentsInChildren = btlDataArray[i].weapon_geo.GetComponentsInChildren<MeshRenderer>();
-                btlDataArray[i].weaponMeshCount = componentsInChildren.Length;
-                btlDataArray[i].weaponRenderer = new Renderer[btlDataArray[i].weaponMeshCount];
-                for (Int32 j = 0; j < btlDataArray[i].weaponMeshCount; ++j)
-                    btlDataArray[i].weaponRenderer[j] = componentsInChildren[j].GetComponent<Renderer>();
-                geo.geoAttach(btlDataArray[i].weapon_geo, btlDataArray[i].gameObject, sb2MonParm.WeaponAttachment);
+                if (!btl_eqp.EnemyBuiltInWeaponTable.TryGetValue(sb2MonParm.Geo, out Int32[] builtInWeapons))
+                    builtInWeapons = null;
+                for (Int32 j = 0; j < sb2MonParm.WeaponAttachment.Length; j++)
+                {
+                    BTL_DATA.WEAPON_MODEL weapon = new BTL_DATA.WEAPON_MODEL();
+                    btl_eqp.SetupWeaponAttachmentFromMonster(weapon, sb2MonParm, j);
+                    if (sb2MonParm.WeaponModel == null || sb2MonParm.WeaponModel.Length <= j || sb2MonParm.WeaponModel[j] == "DEFAULT")
+                        weapon.geo = null;
+                    else if (sb2MonParm.WeaponModel[j] == "NONE")
+                        weapon.geo = new GameObject(btl_eqp.DummyWeaponName);
+                    else if (sb2MonParm.WeaponModel[j].StartsWith("GEO_WEP"))
+                        weapon.geo = ModelFactory.CreateModel("BattleMap/BattleModel/battle_weapon/" + sb2MonParm.WeaponModel[j] + "/" + sb2MonParm.WeaponModel[j], true, true, Configuration.Graphics.ElementsSmoothTexture);
+                    else
+                        weapon.geo = ModelFactory.CreateModel(sb2MonParm.WeaponModel[j], true, true, Configuration.Graphics.ElementsSmoothTexture);
+                    weapon.builtin_mode = weapon.geo != null && builtInWeapons != null && builtInWeapons.Contains(weapon.bone);
+                    if (weapon.geo != null)
+                        geo.geoAttach(weapon.geo, btl[i].gameObject, weapon.bone);
+                    btl[i].weaponModels.Add(weapon);
+                }
             }
             else if (ModelFactory.IsUseAsEnemyCharacter(path))
             {
                 if (path.Contains("GEO_MON_B3_168"))
-                    btlDataArray[i].gameObject.transform.FindChild("mesh5").gameObject.SetActive(false);
-                btlDataArray[i].weapon_geo = ModelFactory.CreateDefaultWeaponForCharacterWhenUseAsEnemy(path);
-                MeshRenderer[] componentsInChildren = btlDataArray[i].weapon_geo.GetComponentsInChildren<MeshRenderer>();
-                btlDataArray[i].weaponMeshCount = componentsInChildren.Length;
-                btlDataArray[i].weaponRenderer = new Renderer[btlDataArray[i].weaponMeshCount];
-                for (Int32 j = 0; j < btlDataArray[i].weaponMeshCount; ++j)
-                    btlDataArray[i].weaponRenderer[j] = componentsInChildren[j].GetComponent<Renderer>();
-                geo.geoAttach(btlDataArray[i].weapon_geo, btlDataArray[i].gameObject, ModelFactory.GetDefaultWeaponBoneIdForCharacterWhenUseAsEnemy(path));
+                    btl[i].gameObject.transform.FindChild("mesh5").gameObject.SetActive(false);
+                btl[i].weapon_geo = ModelFactory.CreateDefaultWeaponForCharacterWhenUseAsEnemy(path);
+                btl[i].weapon_bone = ModelFactory.GetDefaultWeaponBoneIdForCharacterWhenUseAsEnemy(path);
+                geo.geoAttach(btl[i].weapon_geo, btl[i].gameObject, btl[i].weapon_bone);
             }
-            if (sb2MonParm.TextureFiles != null)
-                ModelFactory.ChangeModelTexture(btlDataArray[i].gameObject, sb2MonParm.TextureFiles);
-            Int32 meshCount = 0;
-            IEnumerator enumerator = btlDataArray[i].gameObject.transform.GetEnumerator();
-            try
+            else
             {
-                while (enumerator.MoveNext())
+                btl[i].weapon_geo = null;
+            }
+            if (btl[i].weapon_geo != null)
+            {
+                MeshRenderer[] weaponRenderers = btl[i].weapon_geo.GetComponentsInChildren<MeshRenderer>();
+                btl[i].weaponMeshCount = weaponRenderers.Length;
+                btl[i].weaponRenderer = new Renderer[btl[i].weaponMeshCount];
+                if (btl[i].weaponMeshCount > 0)
+                    for (Int32 j = 0; j < btl[i].weaponMeshCount; j++)
+                        btl[i].weaponRenderer[j] = weaponRenderers[j].GetComponent<Renderer>();
+            }
+            if (sb2MonParm.WeaponTextureFiles != null)
+            {
+                for (Int32 j = 0; j < btl[i].weaponModels.Count; j++)
                 {
-                    if ((enumerator.Current as UnityEngine.Object)?.name.Contains("mesh") == true)
-                        ++meshCount;
+                    if (btl[i].weaponModels[j].geo == null || btl[i].weaponModels[j].geo.name == btl_eqp.DummyWeaponName)
+                        continue;
+                    List<String> textureFiles = new List<String>();
+                    for (Int32 k = 0; k < sb2MonParm.WeaponTextureFiles.Length; k++)
+                    {
+                        String file = sb2MonParm.WeaponTextureFiles[k];
+                        Int32 weaponIndex = 0;
+                        String[] splitted = file.Split([':'], 2);
+                        if (splitted.Length == 2)
+                        {
+                            Int32.TryParse(splitted[0], out weaponIndex);
+                            file = splitted[1];
+                        }
+                        if (weaponIndex == j)
+                            textureFiles.Add(file);
+                    }
+                    if (textureFiles.Count > 0)
+                    {          
+                        MeshRenderer[] weaponRenderers = btl[i].weaponModels[j].geo.GetComponentsInChildren<MeshRenderer>();
+                        if (weaponRenderers.Length > 0)
+                            for (Int32 k = 0; k < weaponRenderers.Length && k < textureFiles.Count; k++)
+                                weaponRenderers[k].GetComponent<Renderer>().material.mainTexture = AssetManager.Load<Texture2D>(textureFiles[k], false);
+                        else // Other kind of model have no btl.weaponMeshCount
+                            ModelFactory.ChangeModelTexture(btl[i].weaponModels[j].geo, textureFiles.ToArray());
+                    }
                 }
             }
-            finally
-            {
-                IDisposable disposable = enumerator as IDisposable;
-                disposable?.Dispose();
-            }
-            btlDataArray[i].meshIsRendering = new Boolean[meshCount];
+            Int32 meshCount = 0;
+            foreach (Transform transform in btl[i].gameObject.transform)
+                if (transform.name.Contains("mesh"))
+                    meshCount++;
+            btl[i].meshCount = meshCount;
+            btl[i].meshIsRendering = new Boolean[meshCount];
             for (Int32 j = 0; j < meshCount; ++j)
-                btlDataArray[i].meshIsRendering[j] = true;
-            btlDataArray[i].meshCount = meshCount;
-            btlDataArray[i].animation = btlDataArray[i].gameObject.GetComponent<Animation>();
-            btlDataArray[i].animation = btlDataArray[i].gameObject.GetComponent<Animation>();
-            btlDataArray[i].typeNo = monType;
-            btlDataArray[i].idleAnimationName = this.animationName[i];
+                btl[i].meshIsRendering[j] = true;
+            btl[i].animation = btl[i].gameObject.GetComponent<Animation>();
         }
     }
 
@@ -352,61 +399,6 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         //}
         //fps = Configuration.Graphics.BattleFPS * newSpeed;
         //frameTime = 1f / fps;
-    }
-
-    public static void playCommand(Int32 characterNo, Int32 slotNo, Int32 target, Boolean isTrance = false)
-    {
-        if (slotNo < 0 || slotNo > 6)
-        {
-            Debug.LogError("slot number value can be only 0 to 5");
-        }
-        else if (characterNo < 0 || characterNo > 4)
-        {
-            Debug.LogError("character number value can be only 1 to 4");
-        }
-        else
-        {
-            BTL_DATA btlData = FF9StateSystem.Battle.FF9Battle.btl_data[characterNo];
-            CharacterPresetId presetId = FF9StateSystem.Common.FF9.party.member[characterNo].info.menu_type;
-            BattleCommandId commandId = BattleCommandId.None;
-            Int32 sub_no = 0;
-            switch (slotNo)
-            {
-                case 0:
-                    commandId = BattleCommandId.Attack;
-                    sub_no = CharacterCommands.Commands[commandId].MainEntry;
-                    break;
-                case 1:
-                    commandId = CharacterCommands.CommandSets[presetId].Get(isTrance, 0);
-                    sub_no = CharacterCommands.Commands[commandId].MainEntry;
-                    break;
-                case 2:
-                    commandId = CharacterCommands.CommandSets[presetId].Get(isTrance, 1);
-                    sub_no = CharacterCommands.Commands[commandId].MainEntry;
-                    break;
-                case 3:
-                    commandId = BattleCommandId.Item;
-                    sub_no = 236; // Potion
-                    break;
-                case 4:
-                    commandId = BattleCommandId.Defend;
-                    sub_no = CharacterCommands.Commands[commandId].MainEntry;
-                    break;
-                case 5:
-                    commandId = BattleCommandId.Change;
-                    sub_no = CharacterCommands.Commands[commandId].MainEntry;
-                    break;
-            }
-
-            if (CharacterCommands.Commands[commandId].Type == CharacterCommandType.Throw)
-                sub_no = (Int32)RegularItem.Dagger;
-
-            if (commandId == BattleCommandId.None)
-                return;
-
-            CMD_DATA cmd = new CMD_DATA { regist = btlData };
-            btl_cmd.SetCommand(cmd, commandId, sub_no, (UInt16)target, 0U);
-        }
     }
 
     private void YMenu_ManagerActiveTime()
@@ -463,7 +455,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
 
                     changed = true;
                     if (advanceAtb)
-                        current.at += (Int16)Math.Max(1, current.at_coef * 4);
+                        current.at += (Int16)(current.at_coef * 4);
                     else
                         needContinue = false;
                 }
@@ -496,7 +488,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
                     needContinue = false;
                 }
 
-                if (!Configuration.Fixes.IsKeepRestTimeInBattle)
+                if (!Configuration.Battle.IsKeepRestTimeInBattle)
                     current.at = maximum.at;
 
                 if (btl_stat.CheckStatus(btl, BattleStatusConst.PreventATBConfirm))
@@ -504,24 +496,31 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
 
                 if (btl.bi.player != 0)
                 {
-                    if (btl_stat.CheckStatus(btl, BattleStatus.Confuse | BattleStatus.Berserk))
+                    if (!btl_cmd.CheckUsingCommand(btl.cmd[0]))
                     {
-                        Int32 num = 0;
-                        while (1 << num != btl.btl_id)
-                            ++num;
-                        if (!UIManager.Battle.InputFinishList.Contains(num))
+                        Boolean autoAttack = false;
+                        foreach (BattleStatusId statusId in btl.stat.cur.ToStatusList())
+                        {
+                            if (!btl.stat.effects.TryGetValue(statusId, out StatusScriptBase effect))
+                                continue;
+                            if ((effect as IAutoAttackStatusScript)?.OnATB() ?? false)
+                            {
+                                autoAttack = true;
+                                break;
+                            }
+                        }
+                        if (autoAttack)
                         {
                             btl.sel_mode = 1;
-                            btl_cmd.SetAutoCommand(btl);
                         }
-                    }
-                    else
-                    {
-                        Int32 playerId = 0;
-                        while (1 << playerId != btl.btl_id)
-                            ++playerId;
-                        if (!UIManager.Battle.ReadyQueue.Contains(playerId))
-                            UIManager.Battle.AddPlayerToReady(playerId);
+                        else
+                        {
+                            Int32 playerId = 0;
+                            while (1 << playerId != btl.btl_id)
+                                ++playerId;
+                            if (!UIManager.Battle.ReadyQueue.Contains(playerId))
+                                UIManager.Battle.AddPlayerToReady(playerId);
+                        }
                     }
                 }
                 else if (!FF9StateSystem.Battle.isDebug)
@@ -534,7 +533,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
                     if (Array.IndexOf(FF9StateSystem.Battle.FF9Battle.seq_work_set.AnmOfsList, this.btlIDList[btl_scrp.FindBattleUnit(btl.btl_id).Data.typeNo]) < 0)
                         Debug.LogError("Index out of range");
 
-                    if (FF9StateSystem.Battle.FF9Battle.btl_phase != 4)
+                    if (FF9StateSystem.Battle.FF9Battle.btl_phase != FF9StateBattleSystem.PHASE_NORMAL)
                         return;
                 }
             }
@@ -551,8 +550,9 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
                 // Update statuses before looping
                 for (btl = source; btl != null; btl = btl.next)
                 {
-                    btl_para.CheckPointData(btl);
-                    btl_stat.CheckStatusLoop(btl);
+                    BattleUnit unit = new BattleUnit(btl);
+                    btl_para.CheckPointData(unit);
+                    btl_stat.CheckStatusLoop(unit);
                 }
                 // Events need to be processed (i.e. atb reset to 0, see issue #430)
                 PersistenSingleton<EventEngine>.Instance.ServiceEvents();
@@ -570,7 +570,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         }
         catch (Exception err)
         {
-            Memoria.Prime.Log.Error(err);
+            Log.Error(err);
         }
     }
 
@@ -593,7 +593,6 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         {
             if (!IsPaused)
                 SmoothFrameUpdater_Battle.ResetState();
-            battleSPS.Service();
             if (IsOver)
                 UpdateOverFrame();
             else
@@ -604,13 +603,75 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         if (!IsPaused)
             FPSManager.AddSmoothEffect(SmoothFrameUpdater_Battle.Apply);
     }
+    
+    // runtime game object and material for creating ambient lighting
+    private ReflectionProbe _reflectionProbe;
+    private bool _hasUpdateProbeCapture = false;
+    private bool _hasUpdateAmbient = false;
+    private Material _skyBox;
 
+    private IEnumerator UpdateAmbientLight()
+    {
+        // TODO: I think BTL_DATA are always initialised at this point because of the call at the end of "InitBattleScene"
+        Boolean hasValidCharacter = false;
+        while (!hasValidCharacter)
+        {
+            hasValidCharacter = FF9StateSystem.Battle.FF9Battle.btl_list.next != null;
+            yield return null;
+        }
+
+        //for (BTL_DATA btl = FF9StateSystem.Battle.FF9Battle.btl_list.next; btl != null; btl = btl.next)
+        //    if (btl.bi.player == 1)
+        
+        if (_reflectionProbe == null)
+        {
+            GameObject obj = new GameObject("EnvironmentCapture");
+            // the position is somewhere above one of the character's head in the battle scene....
+            obj.transform.position = new Vector3(632.0f, 500.0f, -1560.0f);
+            _reflectionProbe = obj.AddComponent<ReflectionProbe>();
+            _reflectionProbe.mode = ReflectionProbeMode.Realtime;
+            _reflectionProbe.cullingMask = -1;
+            _reflectionProbe.refreshMode = ReflectionProbeRefreshMode.ViaScripting;
+            _reflectionProbe.size = new Vector3(10000, 10000, 10000);
+            _reflectionProbe.resolution = 128;
+            _reflectionProbe.clearFlags = ReflectionProbeClearFlags.SolidColor;
+            _reflectionProbe.backgroundColor = Color.black;
+        }
+        
+        if (_skyBox == null)
+            _skyBox = new Material(ShadersLoader.Find("PSX/Skybox_Cubemap"));
+        
+        if (_reflectionProbe != null)
+        {
+            RenderSettings.ambientMode = AmbientMode.Skybox;
+            RenderSettings.ambientIntensity = Configuration.Shaders.Shader_Battle_Toon == 1 ? 0.8f : 1.5f;
+            RenderSettings.skybox = _skyBox;
+            _reflectionProbe.RenderProbe();
+        }
+        // this simply mean the reflection probe's texture are not yet update internally.
+        // so we need to wait for it.
+        while (_reflectionProbe.texture.name.Contains("Black"))
+        {
+            yield return new WaitForEndOfFrame();
+        }
+        _skyBox.SetTexture("_Tex", _reflectionProbe.texture);
+        _skyBox.SetFloat("_Exposure", Configuration.Shaders.Shader_Battle_Toon == 1 ? 0.5f : 1.0f);
+        
+        // This is a slow operation, make sure this code only run once.
+        DynamicGI.UpdateEnvironment();
+    }
+
+    private Coroutine _updateAmbientRoutine = null;
+    private float _debugNormal = -1;
+    private float _debugSH = -1;
+    
     private void UpdateBattleFrame()
     {
         if (IsPaused)
             return;
 
         HonoluluBattleMain.counterATB = 0;
+        battleSPS.EffectUpdate();
         this.battleResult = battle.BattleMain();
         if (!FF9StateSystem.Battle.isDebug)
         {
@@ -619,7 +680,6 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
 
             for (BTL_DATA btl = FF9StateSystem.Battle.FF9Battle.btl_list.next; btl != null; btl = btl.next)
                 btl.CheckDelayedModifier();
-            BattleCalculator.FrameAppliedEffectList.Clear();
 
             if (this.battleResult == 1)
             {
@@ -628,6 +688,10 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
             }
         }
         SceneDirector.ServiceFade();
+        foreach (BattleCalculator calc in BattleCalculator.FrameAppliedEffectList)
+            BattleHUD.EffectedBtlId |= calc.Target.Id;
+        BattleCalculator.FrameAppliedEffectList.Clear();
+        btl_mot.BtlActivatedThisFrame.Clear();
     }
 
     private static void UpdateOverFrame()
@@ -635,14 +699,14 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         FF9StateGlobal ff9StateGlobal = FF9StateSystem.Common.FF9;
         switch (ff9StateGlobal.btl_result)
         {
-            case 1:
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 7:
-                if (ff9StateGlobal.btl_result == 2)
-                    ff9StateGlobal.btl_result = 1;
+            case FF9StateGlobal.BTL_RESULT_VICTORY:
+            case FF9StateGlobal.BTL_RESULT_VICTORY_NO_POSE:
+            case FF9StateGlobal.BTL_RESULT_DEFEAT:
+            case FF9StateGlobal.BTL_RESULT_ESCAPE:
+            case FF9StateGlobal.BTL_RESULT_INTERRUPTION:
+            case FF9StateGlobal.BTL_RESULT_ENEMY_FLEE:
+                if (ff9StateGlobal.btl_result == FF9StateGlobal.BTL_RESULT_VICTORY_NO_POSE)
+                    ff9StateGlobal.btl_result = FF9StateGlobal.BTL_RESULT_VICTORY;
                 if (FF9StateSystem.Battle.FF9Battle.map.nextMode == 1 || FF9StateSystem.Battle.FF9Battle.map.nextMode == 5)
                     FF9StateSystem.Common.FF9.fldMapNo = FF9StateSystem.Battle.FF9Battle.map.nextMapNo;
                 else if (FF9StateSystem.Battle.FF9Battle.map.nextMode == 3)
@@ -654,7 +718,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
                     SceneDirector.ServiceFade();
                 }
                 return;
-            case 6:
+            case FF9StateGlobal.BTL_RESULT_GAMEOVER:
                 UIManager.Battle.GoToGameOver();
                 return;
             default:
@@ -682,9 +746,21 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
             }
             btlseq.FF9DrawShadowCharBattle(stateBattleSystem.map.shadowArray[btl], btl, 0, BoneNo);
         }
+
+        // Smooth all battle character once
+        for (BTL_DATA btl = FF9StateSystem.Battle.FF9Battle.btl_list.next; btl != null; btl = btl.next)
+        {
+            if (btl.bi.slave != 0 || btl.bi.disappear != 0 || btl.bi.shadow == 0)
+                continue;
+            if (btl._hasMeshSmoothed)
+                continue;
+            NormalSolver.SmoothCharacterMesh(btl.gameObject.GetComponentsInChildren<SkinnedMeshRenderer>());
+            NormalSolver.SmoothCharacterMesh(btl.gameObject.GetComponentsInChildren<MeshRenderer>());
+            btl._hasMeshSmoothed = true;
+        }
     }
 
-    private static void UpdateAttachModel()
+    public static void UpdateAttachModel()
     {
         foreach (KeyValuePair<BTL_DATA, BTL_DATA> kvp in attachModel)
         {
@@ -704,9 +780,11 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
 
     public static void SetupAttachModel(BTL_DATA carryingBtl, BTL_DATA attachedBtl, Int32 boneIndex, Int32 offset)
     {
+        if (carryingBtl.gameObject == null || attachedBtl.gameObject == null)
+            return;
         Transform attachedTransform = attachedBtl.gameObject.transform;
         Transform rootTransform = attachedTransform.GetChildByName("bone000").transform;
-        Transform carryingBone = carryingBtl.gameObject.transform.GetChildByName("bone" + boneIndex.ToString("D3"));
+        Transform carryingBone = carryingBtl.gameObject.transform.GetChildByName($"bone{boneIndex:D3}");
         attachedTransform.parent = carryingBone.transform;
         attachedTransform.localPosition = Vector3.zero;
         attachedTransform.localRotation = Quaternion.identity;
@@ -721,7 +799,9 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
     public static void ClearAttachModel(BTL_DATA attachedBtl)
     {
         attachModel.RemoveAll(kvp => kvp.Value == attachedBtl);
-        attachedBtl.gameObject.transform.parent = null;
+        attachedBtl.attachOffset = 0;
+        if (attachedBtl.gameObject != null)
+            attachedBtl.gameObject.transform.parent = battlebg.BattleRoot.transform;
     }
 
     public static Boolean IsAttachedModel(BTL_DATA btl)
@@ -734,6 +814,7 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
         UpdateAttachModel();
         UIManager.Battle.modelButtonManager.UpdateModelButtonPosition();
         Singleton<HUDMessage>.Instance.UpdateChildPosition();
+        btl_eqp.UpdateWeaponOffsets();
     }
 
     public Int32 GetWeaponID(Int32 battlePlayerPosID)
@@ -758,6 +839,18 @@ public class HonoluluBattleMain : PersistenSingleton<MonoBehaviour>
     private void OnDestroy()
     {
         SFX.EndBattle();
+        if (Configuration.Shaders.CustomShaderEnabled == 1)
+        {
+            // Make sure we destroy the object we created for ambient lighting during init phase
+            if (_reflectionProbe != null)
+            {
+                Destroy(_reflectionProbe.gameObject);
+                _hasUpdateProbeCapture = false;
+                _hasUpdateAmbient = false;
+            }
+            StopCoroutine(_updateAmbientRoutine);
+            _updateAmbientRoutine = null;   
+        }
 
         for (BTL_DATA btlData = FF9StateSystem.Battle.FF9Battle.btl_list.next; btlData != null; btlData = btlData.next)
         {

@@ -1,7 +1,7 @@
-using System;
 using Assets.Sources.Scripts.UI.Common;
 using FF9;
 using Memoria.Data;
+using System;
 
 namespace Memoria
 {
@@ -57,6 +57,8 @@ namespace Memoria
         public UInt16 DroppableCardRate => Data.bonus_card_rate;
         public UInt32 BonusExperience => Data.bonus_exp;
         public UInt32 BonusGil => Data.bonus_gil;
+        public Boolean AttackOnDeath => Data.info.die_atk;
+        public Boolean AlternateDeathAnim => Data.info.die_dmg;
 
         public static BattleEnemy Find(BattleUnit unit)
         {
@@ -99,6 +101,7 @@ namespace Memoria
         public static implicit operator CMD_DATA(BattleCommand cmd) => cmd.Data;
 
         public BattleCommandId Id => Data.cmd_no;
+        public Int32 RawIndex => Data.sub_no;
         public String AbilityName => AbilityId != BattleAbilityId.Void ? FF9TextTool.ActionAbilityName(AbilityId) : ItemId != RegularItem.NoItem ? FF9TextTool.ItemName(ItemId) : Data.aa.Name;
         public String AbilityCastingName => UIManager.Battle.GetBattleCommandTitle(Data);
         public BattleAbilityId AbilityId => btl_util.GetCommandMainActionIndex(Data);
@@ -106,8 +109,9 @@ namespace Memoria
         public Boolean IsManyTarget => (Data.info.cursor & 1) != 0;
         public Int32 TargetCount => (Int32)btl_util.SumOfTarget(Data);
         public TargetType TargetType => Data.aa.Info.Target;
-        public BattleStatusIndex AbilityStatusIndex => Data.aa.AddStatusNo;
+        public StatusSetId AbilityStatusIndex => Data.aa.AddStatusNo;
         public SpecialEffect SpecialEffect => (SpecialEffect)Data.aa.Info.VfxIndex;
+        public BattleUnit Caster => Data.regist != null ? new BattleUnit(Data.regist) : null;
         public Boolean IsATBCommand => Data.regist != null && Data == Data.regist.cmd[0];
         public Boolean IsMeteorMiss => Data.info.meteor_miss != 0;
         public Boolean IsShortSummon
@@ -118,8 +122,9 @@ namespace Memoria
         public Boolean IsZeroMP => Data.info.IsZeroMP;
         public Int32 CommandMPCost => Data.GetCommandMPCost(); // This takes AA features into account but not increased summon cost early on or player MP cost factor
         public BattleCommandMenu CommandMenu => Data.info.cmdMenu;
+        public command_mode_index ExecutionStep => Data.info.mode;
 
-        public Boolean IsDevided => IsManyTarget && (Int32)Data.aa.Info.Target > 2 && (Int32)Data.aa.Info.Target < 6;
+        public Boolean IsDevided => IsManyTarget && Data.aa.Info.Target >= TargetType.ManyAny && Data.aa.Info.Target <= TargetType.ManyEnemy;
 
         public BattleItem Item => BattleItem.Find(ItemId);
         public BattleStatus ItemStatus => Item.Status;
@@ -130,7 +135,7 @@ namespace Memoria
         public Boolean IsGround => HasElement(EffectElement.Earth);
 
         public Boolean IsShortRange
-		{
+        {
             get => Data.IsShortRange;
             set => Data.IsShortRange = value;
         }
@@ -183,6 +188,18 @@ namespace Memoria
         public Boolean HasElement(EffectElement element)
         {
             return (Element & element) != 0;
+        }
+
+        public Int32 GetReflectMultiplierOnTarget(UInt16 targetId)
+        {
+            // Always return at least 1 even if not part of the command's targets, in order to take possible .seq target changes into account properly
+            if (Data.info.reflec != 1)
+                return 1;
+            Int32 reflectMultiplier = 0;
+            for (UInt16 index = 0; index < 4; ++index)
+                if ((Data.reflec.tar_id[index] & targetId) != 0)
+                    ++reflectMultiplier;
+            return Math.Max(1, reflectMultiplier);
         }
     }
 }

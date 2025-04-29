@@ -1,7 +1,7 @@
 using System;
-using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace Memoria.Prime.Text
@@ -144,6 +144,34 @@ namespace Memoria.Prime.Text
             return result.ToString();
         }
 
+        /// <summary>Search for the (n+1)-th occurence of a string</summary>
+        /// <returns>The index position of that occurence or -1 if the search string was not found enough times</returns>
+        public static Int32 FindNthOccurence(this String str, String search, Int32 n)
+        {
+            Int32 pos = 0;
+            while (n >= 0)
+            {
+                pos = str.IndexOf(search, pos) + 1;
+                if (pos <= 0)
+                    return -1;
+                n--;
+            }
+            return pos;
+        }
+
+        /// <summary>Non-regex search count</summary>
+        public static Int32 OccurenceCount(this String str, String search)
+        {
+            Int32 pos = str.IndexOf(search);
+            Int32 count = 0;
+            while (pos >= 0)
+            {
+                count++;
+                pos = str.IndexOf(search, pos + 1);
+            }
+            return count;
+        }
+
         public static String TrimEnd(this String source, String sufix, StringComparison comparisonType)
         {
             if (source == null)
@@ -173,17 +201,33 @@ namespace Memoria.Prime.Text
             foreach (FieldInfo f in type.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy))
             {
                 if (f.Name == source)
-				{
+                {
                     field = f;
                     return true;
-				}
-			}
+                }
+            }
             field = null;
             return false;
         }
 
+        public static Boolean TryPublicFieldParse(this String source, Object obj, out Object field)
+        {
+            field = null;
+            if (obj == null)
+                return false;
+            foreach (FieldInfo f in obj.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy))
+            {
+                if (f.Name == source)
+                {
+                    field = f.GetValue(obj);
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public static Boolean TryEnumParse<T>(this String source, out T value) where T : Enum
-		{
+        {
             try
             {
                 value = (T)Enum.Parse(typeof(T), source);
@@ -244,7 +288,7 @@ namespace Memoria.Prime.Text
         }
 
         public static Boolean TryArrayParse(this String[] source, Type t, out object obj)
-		{
+        {
             Array arr = Array.CreateInstance(t, source.Length);
             Boolean ok = true;
             object buffer;
@@ -257,6 +301,6 @@ namespace Memoria.Prime.Text
             }
             obj = ok ? arr : null;
             return ok;
-		}
+        }
     }
 }

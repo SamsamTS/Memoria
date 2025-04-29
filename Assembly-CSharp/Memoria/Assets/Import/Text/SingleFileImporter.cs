@@ -1,6 +1,6 @@
+using Memoria.Prime;
 using System;
 using System.IO;
-using Memoria.Prime;
 
 namespace Memoria.Assets
 {
@@ -17,7 +17,7 @@ namespace Memoria.Assets
                 TextResourceReference importPath = ImportPath;
                 if (!importPath.IsExists(out TextResourcePath existingFile))
                 {
-                    Log.Warning($"[{TypeName}] Import was skipped bacause a file does not exist: [{importPath}].");
+                    Log.Warning($"[{TypeName}] Import was skipped because a file does not exist: [{importPath}].");
                     return false;
                 }
 

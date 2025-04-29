@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Assets.Sources.Scripts.UI.Common;
 using FF9;
 using Memoria;
 using Memoria.Data;
-using Memoria.Database;
 using Memoria.Prime;
 using Memoria.Scenes;
-using Memoria.Test;
+using Memoria.Database;
+using System;
+using System.Linq;
+using System.Collections.Generic;
 using UnityEngine;
-
-// ReSharper disable InconsistentNaming
-// ReSharper disable NotAccessedField.Global
 
 public partial class BattleHUD : UIScene
 {
@@ -64,7 +62,7 @@ public partial class BattleHUD : UIScene
         SetHudVisibility(!UIManager.Input.GetKey(Control.Special));
         UpdateAndroidTV();
     }
-    
+
     private void Awake()
     {
         FadingComponent = ScreenFadeGameObject.GetExactComponent<HonoFading>();
@@ -110,6 +108,25 @@ public partial class BattleHUD : UIScene
         if (Configuration.Control.WrapSomeMenus)
             foreach (GONavigationButton button in _targetPanel.AllTargets)
                 button.KeyNavigation.wrapUpDown = true;
+
+        _abilityPanel.Background.Panel.Name.Label.fixedAlignment = true;
+        _itemPanel.Background.Panel.Name.Label.fixedAlignment = true;
+    }
+
+    private void UpdateSprites()
+    {
+        UISprite[] relevantUI = gameObject.GetComponentsInChildren<UISprite>(true);
+        BetterList<String> atlasSpriteList = FF9UIDataTool.WindowAtlas.GetListOfSprites();
+        foreach (UISprite ui in relevantUI)
+        {
+            if (ui.atlas == FF9UIDataTool.WindowAtlas)
+            {
+                if (!ui.spriteName.StartsWith("battle_") && atlasSpriteList.Contains("battle_" + ui.spriteName))
+                    ui.spriteName = "battle_" + ui.spriteName;
+                else if (ui.spriteName.StartsWith("battle_") && !atlasSpriteList.Contains(ui.spriteName))
+                    ui.spriteName = ui.spriteName.Substring("battle_".Length);
+            }
+        }
     }
 
     private void UpdateAndroidTV()
@@ -187,7 +204,7 @@ public partial class BattleHUD : UIScene
                 continue;
 
             BattleUnit player = FF9StateSystem.Battle.FF9Battle.GetUnit(character.PlayerId);
-            if (player.IsUnderAnyStatus(BattleStatus.Confuse | BattleStatus.Berserk) && character.ATBBlink)
+            if (player.Data.stat.HasAutoAttackEffect && character.ATBBlink)
                 character.ATBBlink = false;
             if (IsEnableInput(player) && !_isAutoAttack)
             {
@@ -253,14 +270,7 @@ public partial class BattleHUD : UIScene
                 if (ItemPanel.activeSelf)
                     DisplayItemRealTime();
 
-                if (_currentCommandId == BattleCommandId.MagicSword && (!_magicSwordCond.IsViviExist || _magicSwordCond.IsViviDead || _magicSwordCond.IsSteinerMini))
-                {
-                    FF9Sfx.FF9SFX_Play(101);
-                    ResetToReady();
-                    return;
-                }
-
-                if (!_isTranceMenu && unit.IsUnderAnyStatus(BattleStatus.Trance))
+                if ((!_isTranceMenu && unit.IsUnderAnyStatus(BattleStatus.Trance)) || _commandEnabledState[_currentCommandIndex] < 2)
                 {
                     FF9Sfx.FF9SFX_Play(101);
                     ResetToReady();
@@ -269,7 +279,7 @@ public partial class BattleHUD : UIScene
             }
         }
 
-        if(switchBtlId >= 0)
+        if (switchBtlId >= 0)
         {
             // Switch to player ready when ForceNextTurn (turn-based)
             Int32 playerId = 0;
@@ -292,23 +302,20 @@ public partial class BattleHUD : UIScene
             RemovePlayerFromAction(unit.Id, needToClearCommand);
         }
 
-        using (List<Int32>.Enumerator enumerator = ReadyQueue.GetEnumerator())
+        for (Int32 index = 0; index < ReadyQueue.Count; ++index)
         {
-            while (enumerator.MoveNext())
+            Int32 current = ReadyQueue[index];
+            if (InputFinishList.Contains(current) || _unconsciousStateList.Contains(current))
+                continue;
+
+            if (_isAutoAttack)
             {
-                Int32 current = enumerator.Current;
-                if (InputFinishList.Contains(current) || _unconsciousStateList.Contains(current))
-                    continue;
-
-                if (_isAutoAttack)
-                {
-                    SendAutoAttackCommand(current);
-                    break;
-                }
-
-                SwitchPlayer(current);
+                SendAutoAttackCommand(current);
                 break;
             }
+
+            SwitchPlayer(current);
+            break;
         }
     }
 
@@ -325,7 +332,8 @@ public partial class BattleHUD : UIScene
             for (Int32 pointNum = 0; pointNum < 2; ++pointNum)
             {
                 DamageAnimationInfo curAnimation = pointNum != 0 ? mpAnimation : hpAnimation;
-                if (curAnimation.FrameLeft != 0)
+                Int32 maxPoint = pointNum != 0 ? (Int32)unit.MaximumMp : (Int32)unit.MaximumHp;
+                if (curAnimation.FrameLeft != 0 && curAnimation.RequiredValue <= maxPoint)
                 {
                     if (curAnimation.IncrementStep >= 0)
                     {
@@ -354,12 +362,11 @@ public partial class BattleHUD : UIScene
                 else
                 {
                     Int32 curPoint = pointNum != 0 ? (Int32)unit.CurrentMp : (Int32)unit.CurrentHp;
-                    Int32 maxPoint = pointNum != 0 ? (Int32)unit.MaximumMp : (Int32)unit.MaximumHp;
                     Int32 diff = curPoint - curAnimation.CurrentValue;
                     if (diff == 0)
                         continue;
                     if (curAnimation.CurrentValue > maxPoint)
-					{
+                    {
                         curAnimation.CurrentValue = maxPoint;
                         continue;
                     }
@@ -385,64 +392,23 @@ public partial class BattleHUD : UIScene
 
     private void ManagerInfo()
     {
-        MagicSwordCondition magicSwordCondition1 = new MagicSwordCondition();
-        MagicSwordCondition magicSwordCondition2 = new MagicSwordCondition();
-        magicSwordCondition1.IsViviExist = _magicSwordCond.IsViviExist;
-        magicSwordCondition1.IsViviDead = _magicSwordCond.IsViviDead;
-        magicSwordCondition1.IsSteinerMini = _magicSwordCond.IsSteinerMini;
-
-        foreach (BattleUnit unit in FF9StateSystem.Battle.FF9Battle.EnumerateBattleUnits())
+        if (CurrentPlayerIndex < 0)
+            return;
+        BattleUnit unit = FF9StateSystem.Battle.FF9Battle.GetUnit(CurrentPlayerIndex);
+        if ((BattleHUD.EffectedBtlId & unit.Id) != 0)
         {
-            if (!unit.IsPlayer)
-                break;
-
-            if (unit.PlayerIndex == CharacterId.Vivi)
-            {
-                magicSwordCondition2.IsViviExist = true;
-                if (unit.CurrentHp == 0)
-                    magicSwordCondition2.IsViviDead = true;
-                else if (unit.IsUnderAnyStatus(BattleStatusConst.NoMagicSword))
-                    magicSwordCondition2.IsViviDead = true;
-            }
-            else if (unit.PlayerIndex == CharacterId.Steiner)
-            {
-                magicSwordCondition2.IsSteinerMini = unit.IsUnderAnyStatus(BattleStatus.Mini);
-            }
-        }
-        if (magicSwordCondition1.Changed(magicSwordCondition2))
-        {
-            _magicSwordCond.IsViviExist = magicSwordCondition2.IsViviExist;
-            _magicSwordCond.IsViviDead = magicSwordCondition2.IsViviDead;
-            _magicSwordCond.IsSteinerMini = magicSwordCondition2.IsSteinerMini;
-            if (CurrentPlayerIndex == -1)
-                return;
-
+            if (ButtonGroupState.ActiveGroup == CommandGroupButton)
+                TryMemorizeCommand();
             DisplayCommand();
         }
-        else
-        {
-            if (_isTranceMenu || CurrentPlayerIndex == -1)
-                return;
-
-            BattleUnit unit = FF9StateSystem.Battle.FF9Battle.GetUnit(CurrentPlayerIndex);
-            if (!unit.IsUnderAnyStatus(BattleStatus.Trance))
-                return;
-
-            DisplayCommand();
-        }
+        BattleHUD.EffectedBtlId = 0;
     }
 
     private Boolean ManageTargetCommand()
     {
         BattleUnit btl = FF9StateSystem.Battle.FF9Battle.GetUnit(CurrentPlayerIndex);
-        if (_currentCommandId == BattleCommandId.MagicSword && (!_magicSwordCond.IsViviExist || _magicSwordCond.IsViviDead || _magicSwordCond.IsSteinerMini))
-        {
-            FF9Sfx.FF9SFX_Play(101);
-            ResetToReady();
-            return false;
-        }
 
-        if (!_isTranceMenu && btl.IsUnderAnyStatus(BattleStatus.Trance))
+        if ((!_isTranceMenu && btl.IsUnderAnyStatus(BattleStatus.Trance)) || _commandEnabledState[_currentCommandIndex] < 2)
         {
             FF9Sfx.FF9SFX_Play(101);
             ResetToReady();
@@ -452,6 +418,18 @@ public partial class BattleHUD : UIScene
         if (_subMenuType == SubMenuType.Ability)
         {
             AA_DATA aaData = GetSelectedActiveAbility(CurrentPlayerIndex, _currentCommandId, _currentSubMenuIndex, out _, out BattleAbilityId abilId);
+
+            AbilityPlayerDetail detail = _abilityDetailDict[CurrentPlayerIndex];
+            if (detail.AbilityMagicSet.TryGetValue(ff9abil.GetAbilityIdFromActiveAbility(abilId), out BattleMagicSwordSet magicSet))
+            {
+                BattleUnit supporter = BattleState.EnumerateUnits().FirstOrDefault(u => u.PlayerIndex == magicSet.Supporter);
+                if (supporter == null || btl.IsUnderAnyStatus(BattleStatusConst.Immobilized | magicSet.BeneficiaryBlockingStatus) || supporter.IsUnderAnyStatus(BattleStatusConst.Immobilized | magicSet.SupporterBlockingStatus))
+                {
+                    FF9Sfx.FF9SFX_Play(101);
+                    ResetToReady();
+                    return false;
+                }
+            }
 
             if (btl.CurrentMp < GetActionMpCost(aaData, btl, abilId))
             {
@@ -463,7 +441,7 @@ public partial class BattleHUD : UIScene
                 return false;
             }
 
-            if ((aaData.Category & 2) != 0 && btl.IsUnderAnyStatus(BattleStatus.Silence))
+            if ((aaData.Category & 2) != 0 && btl.IsUnderAnyStatus(BattleStatusConst.CannotUseMagic))
             {
                 FF9Sfx.FF9SFX_Play(101);
                 DisplayAbility();
@@ -476,7 +454,7 @@ public partial class BattleHUD : UIScene
         else if ((_subMenuType == SubMenuType.Item || _subMenuType == SubMenuType.Throw) && ff9item.FF9Item_GetCount(_itemIdList[_currentSubMenuIndex]) == 0)
         {
             FF9Sfx.FF9SFX_Play(101);
-            DisplayItem(_subMenuType == SubMenuType.Throw);
+            DisplayItem(CharacterCommands.Commands[_currentCommandId]);
             SetTargetVisibility(false);
             ClearModelPointer();
             SetItemPanelVisibility(true, true);
@@ -534,10 +512,11 @@ public partial class BattleHUD : UIScene
 
     private void OnAllTargetClick(GameObject go)
     {
+        Boolean commandSent = false;
         if (_cursorType == CursorGroup.All)
         {
             FF9Sfx.FF9SFX_Play(103);
-            CheckDoubleCast(-1, _cursorType);
+            commandSent = CheckDoubleCast(-1, _cursorType);
         }
         else if (UICamera.currentTouchID == 0 || UICamera.currentTouchID == 1)
         {
@@ -545,16 +524,16 @@ public partial class BattleHUD : UIScene
             if (go == _targetPanel.Buttons.Player.GameObject)
             {
                 if (_cursorType == CursorGroup.AllPlayer)
-                    CheckDoubleCast(-1, _cursorType);
+                    commandSent = CheckDoubleCast(-1, _cursorType);
                 else
                     OnTargetNavigate(go, KeyCode.RightArrow);
             }
             else if (go == _targetPanel.Buttons.Enemy.GameObject)
             {
-                    if (_cursorType == CursorGroup.AllEnemy)
-                        CheckDoubleCast(-1, _cursorType);
-                    else
-                        OnTargetNavigate(go, KeyCode.LeftArrow);
+                if (_cursorType == CursorGroup.AllEnemy)
+                    commandSent = CheckDoubleCast(-1, _cursorType);
+                else
+                    OnTargetNavigate(go, KeyCode.LeftArrow);
             }
         }
         else
@@ -567,7 +546,12 @@ public partial class BattleHUD : UIScene
                 _cursorType = CursorGroup.AllPlayer;
             else if (go == _targetPanel.Buttons.Enemy.GameObject)
                 _cursorType = CursorGroup.AllEnemy;
-            CheckDoubleCast(-1, _cursorType);
+            commandSent = CheckDoubleCast(-1, _cursorType);
+        }
+        if (commandSent)
+        {
+            SetTargetVisibility(false);
+            SetIdle();
         }
     }
 
@@ -603,14 +587,68 @@ public partial class BattleHUD : UIScene
             return;
         CurrentPlayerIndex = playerIndex;
         _currentCommandIndex = BattleCommandMenu.Attack;
-        
+
         BattleUnit enemy = GetFirstAliveEnemy();
         if (enemy != null)
         {
-            btl_cmd.SetCommand(player.Data.cmd[0], BattleCommandId.Attack, (Int32)BattleAbilityId.Attack, enemy.Id, 0U);
+            Boolean cmdSent = false;
+            if (Configuration.Battle.ViviAutoAttack && player.PlayerIndex == CharacterId.Vivi)
+                cmdSent = SelectViviMagicInsteadOfAttack_AutoAttack(player, enemy);
+            if (!cmdSent)
+                btl_cmd.SetCommand(player.Data.cmd[0], BattleCommandId.Attack, (Int32)BattleAbilityId.Attack, enemy.Id, 0U);
             InputFinishList.Add(CurrentPlayerIndex);
         }
         CurrentPlayerIndex = -1;
+    }
+
+    private Boolean SelectViviMagicInsteadOfAttack_AutoAttack(BattleUnit caster, BattleUnit target)
+    {
+        CMD_DATA testCommand = new CMD_DATA
+        {
+            regist = caster.Data,
+            cmd_no = BattleCommandId.BlackMagic,
+            tar_id = target.Id
+        };
+
+        Single bestRating = 0;
+        BattleAbilityId bestAbility = 0;
+
+        BattleAbilityId[] abilityIds = { BattleAbilityId.Fire, BattleAbilityId.Blizzard, BattleAbilityId.Thunder };
+        abilityIds.Shuffle();
+
+        foreach (BattleAbilityId abilityId in abilityIds)
+        {
+            if (GetAbilityState(ff9abil.GetAbilityIdFromActiveAbility(abilityId)) != AbilityStatus.Enable)
+                continue;
+
+            testCommand.sub_no = (Int32)abilityId;
+            testCommand.SetAAData(FF9StateSystem.Battle.FF9Battle.aa_data[abilityId]);
+            testCommand.ScriptId = btl_util.GetCommandScriptId(testCommand);
+
+            BattleScriptFactory factory = SBattleCalculator.FindScriptFactory(testCommand.ScriptId);
+            if (factory == null)
+                continue;
+
+            BattleCalculator v = new BattleCalculator(caster.Data, target.Data, new BattleCommand(testCommand));
+            IEstimateBattleScript script = factory(v) as IEstimateBattleScript;
+            if (script == null)
+                continue;
+
+            Single rating = script.RateTarget();
+            if (rating > bestRating)
+            {
+                bestRating = rating;
+                bestAbility = abilityId;
+            }
+        }
+
+        if (bestRating > 0)
+        {
+            caster.Data.cmd[0].info.IsZeroMP = true;
+            btl_cmd.SetCommand(caster.Data.cmd[0], BattleCommandId.BlackMagic, (Int32)bestAbility, target.Id, 0U);
+            return true;
+        }
+        return false;
     }
 
     private void ResetToReady()

@@ -1,5 +1,5 @@
-using System;
 using Memoria.Data;
+using System;
 
 namespace Memoria.Scripts.Battle
 {
@@ -42,7 +42,7 @@ namespace Memoria.Scripts.Battle
 
             if (_v.Target.IsZombie)
             {
-                Int32 rate = BattleScriptStatusEstimate.RateStatus(BattleStatus.Death);
+                Int32 rate = BattleScriptStatusEstimate.RateStatus(BattleStatusId.Death);
                 if (!_v.Target.IsPlayer)
                     rate *= -1;
 

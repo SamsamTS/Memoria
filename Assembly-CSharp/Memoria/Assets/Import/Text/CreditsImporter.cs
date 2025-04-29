@@ -1,6 +1,6 @@
+using Memoria.Prime;
 using System;
 using System.IO;
-using Memoria.Prime;
 using UnityEngine;
 
 namespace Memoria.Assets
@@ -46,7 +46,7 @@ namespace Memoria.Assets
                     externalPath = ModTextResources.Import.Credits;
                     if (!File.Exists(externalPath))
                     {
-                        Log.Warning($"[{TypeName}] Import was skipped bacause a file does not exist: [{_externalPath}].");
+                        Log.Warning($"[{TypeName}] Import was skipped because a file does not exist: [{_externalPath}].");
                         return false;
                     }
                 }

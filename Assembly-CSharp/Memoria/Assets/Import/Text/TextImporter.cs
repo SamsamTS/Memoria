@@ -1,6 +1,6 @@
+using Memoria.Prime.Threading;
 using System;
 using System.Collections;
-using Memoria.Prime.Threading;
 
 namespace Memoria.Assets
 {
@@ -25,6 +25,13 @@ namespace Memoria.Assets
 
             if (!task.Result)
                 throw new Exception("Failed to load embaded resources.");
+        }
+
+        public Boolean LoadSync()
+        {
+            if (Configuration.Import.Text)
+                return LoadExternal();
+            return LoadInternal();
         }
 
         protected abstract Boolean LoadExternal();

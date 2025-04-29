@@ -1,6 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <UsingTask AssemblyFile="$(SolutionDir)\References\Memoria.MSBuild.dll" TaskName="Memoria.MSBuild.Pack" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -10,38 +8,32 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Memoria.Patcher</RootNamespace>
     <AssemblyName>Memoria.Patcher</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <TargetFramework>net472</TargetFramework>
     <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile>
-    </TargetFrameworkProfile>
     <IsWebBootstrapper>false</IsWebBootstrapper>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
     <PublishUrl>publish\</PublishUrl>
-    <Install>true</Install>
-    <InstallFrom>Disk</InstallFrom>
-    <UpdateEnabled>false</UpdateEnabled>
-    <UpdateMode>Foreground</UpdateMode>
-    <UpdateInterval>7</UpdateInterval>
-    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
-    <UpdatePeriodically>false</UpdatePeriodically>
-    <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
-    <UseApplicationTrust>false</UseApplicationTrust>
-    <BootstrapperEnabled>true</BootstrapperEnabled>
+    <ApplicationIcon>ff9.ico</ApplicationIcon>
+    <SignAssembly>false</SignAssembly>
+    <AssemblyOriginatorKeyFile>memoria.key.pfx</AssemblyOriginatorKeyFile>
+    <ApplicationVersion>1.0.0.*</ApplicationVersion>
+    <SelfContained>True</SelfContained>
+    <BaseOutputPath>..\Output\</BaseOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
     <OutputPath>..\Output\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>default</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -54,20 +46,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>default</LangVersion>
   </PropertyGroup>
-  <PropertyGroup>
-    <ApplicationIcon>ff9.ico</ApplicationIcon>
-  </PropertyGroup>
-  <PropertyGroup>
-    <SignAssembly>false</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>memoria.key.pfx</AssemblyOriginatorKeyFile>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.XML" />
-  </ItemGroup>
   <ItemGroup>
     <Compile Include="ConsoleProgressHandler.cs" />
     <Compile Include="GameInfo\GameLocationSteamRegistryProvider.cs" />
@@ -81,18 +59,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="memoria.key.pfx" />
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\es\evt_alex1_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\es\evt_alex1_at_pub.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\es\evt_alex2_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\es\evt_alex3_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\es\evt_cleyra1_dun_05.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -132,106 +98,19 @@
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\es\evt_tera_ta_ivk_0.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\es\evt_treno1_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\es\evt_treno2_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_alex1_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_alex2_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_alex3_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_fossil_fr_dn2_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_treno1_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_treno2_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_alex1_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_alex2_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_alex3_ac_h2f.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_fossil_fr_dn2_0.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_treno1_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_treno2_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\it\evt_alex1_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\it\evt_alex2_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\it\evt_alex3_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\it\evt_fossil_fr_dn2_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\it\evt_treno1_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\it\evt_treno2_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\jp\evt_alex2_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\jp\evt_alex3_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\jp\evt_treno2_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_alex1_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_alex2_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_alex3_ac_h2f.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_fossil_fr_dn2_0.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_treno1_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_treno2_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_alex1_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_alex2_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_alex3_ac_h2f.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_fossil_fr_dn2_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_alex1_at_pub.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_cleyra1_dun_05.eb.bytes">
@@ -270,9 +149,6 @@
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\fr\evt_tera_ta_ivk_0.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_alex1_at_pub.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_cleyra1_dun_05.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -307,9 +183,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\gr\evt_tera_ta_ivk_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\it\evt_alex1_at_pub.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\it\evt_cleyra1_dun_05.eb.bytes">
@@ -375,9 +248,6 @@
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\jp\evt_tera_ta_ivk_0.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_alex1_at_pub.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_cleyra1_dun_05.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -414,9 +284,6 @@
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\uk\evt_tera_ta_ivk_0.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_alex1_at_pub.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_cleyra1_dun_05.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -451,12 +318,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_tera_ta_ivk_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_treno1_tr_gat_0.eb.bytes">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="StreamingAssets\Assets\Resources\commonasset\eventengine\eventbinary\field\us\evt_treno2_tr_gat_0.eb.bytes">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Assets\Resources\Fieldmaps\fbg_n06_vgdl_map097_dl_viw_0\fbg_n06_vgdl_map097_dl_viw_0.bgs.bytes">
@@ -541,6 +402,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Data\SpecialEffects\Common\SequenceDefend.seq">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="StreamingAssets\Data\SpecialEffects\Common\SHP.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="StreamingAssets\Data\SpecialEffects\Common\SPS.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Data\SpecialEffects\ef000\PlayerSequence.seq">
@@ -3468,9 +3335,34 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="ff9.ico" />
+    <Content Include="FF9_Data\EmbeddedAsset\UI\Sprites\changetodisc2.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="FF9_Data\EmbeddedAsset\UI\Sprites\changetodisc3.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="FF9_Data\EmbeddedAsset\UI\Sprites\changetodisc4.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <None Include="StreamingAssets\Data\Text\LocalizationPatch.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Content Include="StreamingAssets\Shaders\PSX\BattleCharacterShaderRef.txt" />
+    <Content Include="StreamingAssets\Shaders\PSX\BattleMap_StatusEffect_RealLighting.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="StreamingAssets\Shaders\PSX\BattleMap_StatusEffect_Toon.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="StreamingAssets\Shaders\PSX\FieldMapActor_RealLighting.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="StreamingAssets\Shaders\PSX\FieldMapActor_Toon.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="StreamingAssets\Shaders\PSX\Skybox_Cubemap.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <None Include="StreamingAssets\Data\World\Environment.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -3615,7 +3507,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Ground.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Ground_Abr_0.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -3624,7 +3516,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Minus.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Minus_Abr_0.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -3636,7 +3528,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Plus.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Plus_Abr_0.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -3650,11 +3542,17 @@
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Plus_Abr_1_Off.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="StreamingAssets\Shaders\PSX\BattleMap_Plus_Abr_0_Substract.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="StreamingAssets\Shaders\PSX\BattleMap_Plus_Abr_0_Multiply.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_SelectCursor_Abr_1.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Sky.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\BattleMap_Sky_Abr_0.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -3687,7 +3585,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\FieldMapActorShadow.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="StreamingAssets\Shaders\PSX\FieldMapActor_Abr_1.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -3897,21 +3795,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <ItemGroup>
-    <BootstrapperPackage Include=".NETFramework,Version=v4.5.2">
-      <Visible>False</Visible>
-      <ProductName>Microsoft .NET Framework 4.5.2 %28x86 et x64%29</ProductName>
-      <Install>true</Install>
-    </BootstrapperPackage>
-    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
-      <Visible>False</Visible>
-      <ProductName>.NET Framework 3.5 SP1</ProductName>
-      <Install>false</Install>
-    </BootstrapperPackage>
-  </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+  <!-- <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>
