@@ -59,9 +59,11 @@ namespace Memoria.Launcher
             ["UseAbsoluteOrientation", "_useAbsoluteOrientation", "UseAbsoluteOrientation", "AnalogControl", 0, 1, 1],
             ["AlwaysCaptureGamepad", "_alwaysCaptureGamepad", "AlwaysCaptureGamepad", "Control", 0, 1, 1],
 
+            ["VSync", "_vSync", "VSync", "Graphics", 0, 1, 1],
             ["SwapConfirmCancel", "_swapConfirmCancel", "SwapConfirmCancel", "Control", 0, 1, 0],
 
             // Sliders
+            ["TextFadeDuration", "_textFadeDuration", "TextFadeDuration", "Interface", 0, 1, 100],
             ["CameraStabilizer", "_camerastabilizer", "CameraStabilizer", "Graphics", 0, 1, 85],
             ["BattleTPS", "_battletpsfactor", "BattleTPS", "Graphics", 0, 1, 15],
             ["SoundVolume", "_soundVolume", "SoundVolume", "Audio", 0, 1, 100],
@@ -331,6 +333,13 @@ namespace Memoria.Launcher
             set => SetProperty(ref _alwaysCaptureGamepad, value);
         }
 
+        private Int16 _vSync;
+        public Int16 VSync
+        {
+            get => _vSync;
+            set => SetProperty(ref _vSync, value);
+        }
+
         private Int16 _swapConfirmCancel;
         public Int16 SwapConfirmCancel
         {
@@ -341,6 +350,13 @@ namespace Memoria.Launcher
         /////////////
         // SLIDERS //
         /////////////
+
+        private Int16 _textFadeDuration;
+        public Int16 TextFadeDuration
+        {
+            get => _textFadeDuration;
+            set => SetProperty(ref _textFadeDuration, value);
+        }
 
         private Int16 _camerastabilizer;
         public Int16 CameraStabilizer
@@ -672,11 +688,12 @@ namespace Memoria.Launcher
                         if (var0 >= 0)
                         {
                             iniFile.SetSetting("Graphics", "Enabled", "1");
-                            if (var0 == 0) { var1 = 30; var2 = 15; var3 = 20; }
-                            if (var0 == 1) { var1 = 30; var2 = 30; var3 = 30; }
-                            if (var0 == 2) { var1 = 60; var2 = 60; var3 = 60; }
-                            if (var0 == 3) { var1 = 90; var2 = 90; var3 = 90; }
-                            if (var0 == 4) { var1 = 120; var2 = 120; var3 = 120; }
+                            if (var0 == 0) { var1 = -1; var2 = -1; var3 = -1; }
+                            if (var0 == 1) { var1 = 30; var2 = 15; var3 = 20; }
+                            if (var0 == 2) { var1 = 30; var2 = 30; var3 = 30; }
+                            if (var0 == 3) { var1 = 60; var2 = 60; var3 = 60; }
+                            if (var0 == 4) { var1 = 90; var2 = 90; var3 = 90; }
+                            if (var0 == 5) { var1 = 120; var2 = 120; var3 = 120; }
                             iniFile.SetSetting("Graphics", "FieldFPS", $"{var1}");
                             iniFile.SetSetting("Graphics", "BattleFPS", $"{var2}");
                             iniFile.SetSetting("Graphics", "WorldFPS", $"{var3}");
@@ -915,9 +932,7 @@ namespace Memoria.Launcher
                     _worldmapmistpreset = -1;
                 Refresh(nameof(WorldmapMistPreset));
 
-                value = iniFile.GetSetting("Graphics", "BattleSwirlFrames");
-                if (String.IsNullOrEmpty(value))
-                    value = " 0";
+                value = iniFile.GetSetting("Graphics", "BattleSwirlFrames", "0");
                 value1isInt = Int16.TryParse(value, out value1);
                 if (value1isInt)
                 {
@@ -927,11 +942,7 @@ namespace Memoria.Launcher
 
 
 
-                value = iniFile.GetSetting("Cheats", "SpeedMode");
-                if (String.IsNullOrEmpty(value))
-                {
-                    value = " 1";
-                }
+                value = iniFile.GetSetting("Cheats", "SpeedMode", "1");
                 value1isInt = Int16.TryParse(value, out value1);
                 if (value1isInt && value1 == 0)
                 {
@@ -941,35 +952,35 @@ namespace Memoria.Launcher
                 else
                 {
                     SpeedMode = 1;
-                    value = iniFile.GetSetting("Cheats", "SpeedFactor");
-                    if (String.IsNullOrEmpty(value))
-                    {
-                        value = " 3";
-                    }
+                    value = iniFile.GetSetting("Cheats", "SpeedFactor", "3");
                     if (!Int16.TryParse(value, out _speedfactor))
                         _speedfactor = 3;
                 }
                 Refresh(nameof(SpeedMode));
                 Refresh(nameof(SpeedFactor));
 
+                value = iniFile.GetSetting("Graphics", "VSync");
+                value4isInt = Int16.TryParse(value, out value4);
                 value = iniFile.GetSetting("Graphics", "FieldFPS");
                 value1isInt = Int16.TryParse(value, out value1);
                 value = iniFile.GetSetting("Graphics", "BattleFPS");
                 value2isInt = Int16.TryParse(value, out value2);
                 value = iniFile.GetSetting("Graphics", "WorldFPS");
                 value3isInt = Int16.TryParse(value, out value3);
-                if (value1isInt && value2isInt && value3isInt)
+                if (value1isInt && value2isInt && value3isInt && value4isInt)
                 {
-                    if (value1 == 30 && value2 == 15 && value3 == 20)
+                    if (value1 == -1 && value2 == -1 && value3 == -1 && value4 == 1)
                         _fpsdropboxchoice = 0;
-                    else if (value1 == 30 && value2 == 30 && value3 == 30)
+                    else if (value1 == 30 && value2 == 15 && value3 == 20)
                         _fpsdropboxchoice = 1;
-                    else if (value1 == 60 && value2 == 60 && value3 == 60)
+                    else if (value1 == 30 && value2 == 30 && value3 == 30)
                         _fpsdropboxchoice = 2;
-                    else if (value1 == 90 && value2 == 90 && value3 == 90)
+                    else if (value1 == 60 && value2 == 60 && value3 == 60)
                         _fpsdropboxchoice = 3;
-                    else if (value1 == 120 && value2 == 120 && value3 == 120)
+                    else if (value1 == 90 && value2 == 90 && value3 == 90)
                         _fpsdropboxchoice = 4;
+                    else if (value1 == 120 && value2 == 120 && value3 == 120)
+                        _fpsdropboxchoice = 5;
                     else
                         _fpsdropboxchoice = -1;
                 }
@@ -1014,7 +1025,7 @@ namespace Memoria.Launcher
                 value = iniFile.GetSetting("Battle", "Speed");
                 if (String.IsNullOrEmpty(value))
                 {
-                    value = " 0";
+                    value = "0";
                     OnPropertyChanged("ATBModeChoice");
                 }
                 if (!Int16.TryParse(value, out _atbmodechoice))
@@ -1136,7 +1147,7 @@ namespace Memoria.Launcher
                 value = iniFile.GetSetting("Battle", "AccessMenus");
                 if (String.IsNullOrEmpty(value))
                 {
-                    value = " 0";
+                    value = "0";
                     OnPropertyChanged(nameof(AccessBattleMenu));
                 }
                 if (!Int16.TryParse(value, out _accessBattleMenu))

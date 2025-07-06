@@ -405,6 +405,9 @@ public class btl_scrp
             case 148:
                 result = btl.bi.t_gauge != 0 ? btl.trance : 0;
                 break;
+            case 149:
+                result = btl.bi.t_gauge;
+                break;
         }
         return result;
     }
@@ -796,9 +799,9 @@ public class btl_scrp
                         ff9Battle.btl_seq = FF9StateBattleSystem.SEQ_DEFEATCLOSE_FADEOUT;
                     }
                     if (ff.btl_result == FF9StateGlobal.BTL_RESULT_INTERRUPTION) // Scripted interruption, such as Black Waltz 3 (first time)
-                        BattleVoice.TriggerOnBattleInOut("BattleInterrupted");
+                        BattleVoice.TriggerOnBattleInOut(BattleVoice.BattleMoment.BattleInterrupted);
                     else if (ff.btl_result == FF9StateGlobal.BTL_RESULT_ENEMY_FLEE) // Enemy flee, such as (Magic) Vice or friendly monsters when attacked
-                        BattleVoice.TriggerOnBattleInOut("EnemyEscape");
+                        BattleVoice.TriggerOnBattleInOut(BattleVoice.BattleMoment.EnemyEscape);
                 }
                 break;
             case 34u: // Game Over

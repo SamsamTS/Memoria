@@ -7,8 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
-using static EventEngine;
-using Debug = UnityEngine.Debug;
 using Object = UnityEngine.Object;
 
 // ReSharper disable NotAccessedField.Global
@@ -192,6 +190,21 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
     private Int32 SelectScene()
     {
         EncountData encountData = this.gMode != 1 ? ff9.w_worldGetBattleScenePtr() : this._enCountData;
+
+        if (SettingsState.IsFriendlyBattleOnly == 1)
+        {
+            for (Int32 i = 0; i < encountData.scene.Length; i++)
+            {
+                if (ff9.w_friendlyBattles.Contains(encountData.scene[i]))
+                    return encountData.scene[i];
+            }
+            return 0;
+        }
+        else if (SettingsState.IsFriendlyBattleOnly == 2)
+        {
+            return 0;
+        }
+
         Int32 num = Comn.random8();
         Int32 index = encountData.pattern & 3;
         if (num < d[index, 0])
@@ -812,7 +825,7 @@ public partial class EventEngine : PersistenSingleton<EventEngine>
 
     public CharacterId GetEventPartyPlayer(Int32 partyIndex)
     {
-        return this._context.eventPartyMember[partyIndex];
+        return partyIndex >= 0 && partyIndex < this._context.eventPartyMember.Length ? this._context.eventPartyMember[partyIndex] : CharacterId.NONE;
     }
 
     public Boolean partychk(Int32 x)

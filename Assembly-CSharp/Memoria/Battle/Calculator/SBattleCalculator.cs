@@ -53,6 +53,7 @@ namespace Memoria
                 command.ScriptId = scriptId;
                 BattleCalculator v = new BattleCalculator(caster, target, command);
                 v.Context.sfxThread = sfxThread;
+                BattleVoice.CurrentCalc = v;
                 BattleScriptFactory factory = FindScriptFactory(scriptId);
                 foreach (SupportingAbilityFeature saFeature in ff9abil.GetEnabledSA(v.Caster))
                     saFeature.TriggerOnAbility(v, "BattleScriptStart", false);
@@ -86,12 +87,14 @@ namespace Memoria
                         if ((v.Context.Flags & (BattleCalcFlags.Miss | BattleCalcFlags.Guard)) != 0)
                         {
                             SBattleCalculator.CalcResult(v);
+                            BattleVoice.CurrentCalc = null;
                             return;
                         }
                     }
                     if ((command.AbilityCategory & 8) != 0 && v.Target.TryKillFrozen()) // Is Physical
                     {
                         SBattleCalculator.CalcResult(v);
+                        BattleVoice.CurrentCalc = null;
                         return;
                     }
                 }
@@ -132,6 +135,7 @@ namespace Memoria
                     Log.Error(err);
                 }
             }
+            BattleVoice.CurrentCalc = null;
         }
 
         public static void CalcResult(BattleCalculator v)
@@ -226,6 +230,7 @@ namespace Memoria
                                 v.Caster.Flags |= CalcFlag.HpRecovery;
                             else
                                 v.Caster.Flags &= ~CalcFlag.HpRecovery;
+                            caster.fig.info |= (UInt16)(v.Caster.Flags & CalcFlag.HpDamageOrHeal);
                             v.Caster.HpDamage = v.Target.HpDamage;
                         }
                     }
@@ -245,6 +250,7 @@ namespace Memoria
                                 v.Caster.Flags |= CalcFlag.MpRecovery;
                             else
                                 v.Caster.Flags &= ~CalcFlag.MpRecovery;
+                            caster.fig.info |= (UInt16)(v.Caster.Flags & CalcFlag.MpDamageOrHeal);
                             v.Caster.MpDamage = v.Target.MpDamage;
                         }
                     }
@@ -290,8 +296,17 @@ namespace Memoria
                 saFeature.TriggerOnAbility(v, "EffectDone", false);
             foreach (SupportingAbilityFeature saFeature in ff9abil.GetEnabledSA(target))
                 saFeature.TriggerOnAbility(v, "EffectDone", true);
-            BattleVoice.TriggerOnBattleAct(caster, "HitEffect", cmd, v);
-            BattleVoice.TriggerOnHitted(target, v);
+            BattleVoice.TriggerOnBattleAct(caster, BattleVoice.BattleMoment.HitEffect, cmd, v);
+            BattleVoice.BattleMoment when = BattleVoice.BattleMoment.Ability;
+            if (v.Command.Data.info.dodge == 1)
+                when = BattleVoice.BattleMoment.Dodged;
+            else if ((v.Context.Flags & BattleCalcFlags.Miss) != 0)
+                when = BattleVoice.BattleMoment.Missed;
+            else if ((v.Target.Flags & (CalcFlag.HpRecovery | CalcFlag.MpRecovery)) != 0)
+                when = BattleVoice.BattleMoment.Healed;
+            else if ((v.Target.Flags & (CalcFlag.HpAlteration | CalcFlag.MpAlteration)) != 0)
+                when = BattleVoice.BattleMoment.Damaged;
+            BattleVoice.TriggerOnHitted(target, when, v);
             BattleCalculator.FrameAppliedEffectList.Add(v);
             if (target.bi.player != 0 || FF9StateSystem.Battle.isDebug)
                 return;
@@ -304,6 +319,10 @@ namespace Memoria
                     PersistenSingleton<EventEngine>.Instance.RequestAction(BattleCommandId.EnemyCounter, targetId, caster.btl_id, (Int32)cmd.cmd_no, cmd.sub_no, cmd);
             }
             PersistenSingleton<EventEngine>.Instance.RequestAction(BattleCommandId.EnemyReaction, targetId, caster.btl_id, (Int32)cmd.cmd_no, cmd.sub_no, cmd);
+
+            IOverloadOnBattleScriptEndScript overloadedMethod = ScriptsLoader.GetOverloadedMethod(typeof(IOverloadOnBattleScriptEndScript)) as IOverloadOnBattleScriptEndScript;
+            if (overloadedMethod != null)
+                overloadedMethod.OnBattleScriptEnd(v);
         }
 
         public static BattleScriptFactory FindScriptFactory(Int32 scriptId)

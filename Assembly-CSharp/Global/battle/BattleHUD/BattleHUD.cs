@@ -454,7 +454,7 @@ public partial class BattleHUD : UIScene
             {
                 _commandPanel.Change.SetLabelText(Localization.Get("Trance"));
                 _commandPanel.Change.SetLabelColor(FF9TextTool.Yellow);
-                _commandPanel.Change.ButtonGroup.Help.Text = "Activates the trance mode.";
+                _commandPanel.Change.ButtonGroup.Help.Text = Localization.GetWithDefault("TranceCommandHelp");
                 _isManualTrance = true;
             }
         }
@@ -1973,27 +1973,14 @@ public partial class BattleHUD : UIScene
                 };
                 testCommand.SetAAData(aaData);
                 testCommand.ScriptId = btl_util.GetCommandScriptId(testCommand);
-                if (Configuration.Mod.TranceSeek && CharacterCommands.Commands[_currentCommandId].Type == CharacterCommandType.Throw) // [DV] Change TargetType for throwing items (magic scrolls for Trance Seek)
-                { // Or i can make it with the DictionaryPatch.txt instead ?
-                    ItemAttack weapon = ff9item.GetItemWeapon(_itemIdList[_currentSubMenuIndex]);
-                    if (((weapon.Category & WeaponCategory.Throw) != 0) && (weapon.ModelId == 65535 || weapon.ModelId == 0))
-                    {
-                        switch (weapon.Offset2)
-                        {
-                            case 1:
-                                targetType = TargetType.SingleAlly;
-                                break;
-                            case 6:
-                                targetType = TargetType.All;
-                                break;
-                            case 7:
-                                targetType = TargetType.AllAlly;
-                                break;
-                            case 8:
-                                targetType = TargetType.AllEnemy;
-                                break;
-                        }
-                    }
+                if (CharacterCommands.Commands[_currentCommandId].Type == CharacterCommandType.Throw && ff9item.HasItemEffect(_itemIdList[_currentSubMenuIndex]))
+                {
+                    ITEM_DATA effect = ff9item.GetItemEffect(_itemIdList[_currentSubMenuIndex]);
+                    if (targetType == TargetType.SingleAny || targetType == TargetType.SingleAlly || targetType == TargetType.SingleEnemy)
+                        targetType = effect.info.Target;
+                    _defaultTargetAlly = effect.info.DefaultAlly;
+                    _defaultTargetDead = effect.info.DefaultOnDead;
+                    _targetDead = effect.info.ForDead;
                 }
                 SelectBestTarget(targetType, testCommand);
             }
